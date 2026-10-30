@@ -47,16 +47,26 @@ CREATE INDEX IF NOT EXISTS files_conv ON assistant.files(conversation_id);
 BM25 = {"on": False}
 
 
+def lakebase_env():
+    """LAKEBASE_ENDPOINT comes from the bundle (resources/app.yml); PGHOST and PGUSER are injected by Databricks Apps from the
+    app's postgres resource. A missing value means the app was deployed without that resource: say so instead of guessing."""
+    missing = [k for k in ("LAKEBASE_ENDPOINT", "PGHOST", "PGUSER") if not os.environ.get(k)]
+    if missing:
+        raise RuntimeError(f"Lakebase non configuré pour cette app ({', '.join(missing)} absent) : redéployez le bundle (install/install.py), "
+                           "qui déclare la ressource postgres de l'app.")
+    return {k: os.environ[k] for k in ("LAKEBASE_ENDPOINT", "PGHOST", "PGUSER")}
+
+
 def conn():
     global _conn, _exp
     with _lock:
         if _conn is None or _conn.closed or time.time() > _exp:
             if _conn is not None and not _conn.closed:
                 _conn.close()
-            tok = ws().postgres.generate_database_credential(endpoint=os.environ["LAKEBASE_ENDPOINT"]).token
-            _conn = psycopg.connect(host=os.environ.get("PGHOST") or os.environ["PGHOST_FALLBACK"], port=int(os.environ.get("PGPORT", "5432")),
-                                    dbname=os.environ.get("PGDATABASE", "databricks_postgres"), user=os.environ.get("PGUSER") or ws().current_user.me().user_name, password=tok,
-                                    sslmode="require", autocommit=True, row_factory=dict_row)
+            env = lakebase_env()
+            tok = ws().postgres.generate_database_credential(endpoint=env["LAKEBASE_ENDPOINT"]).token
+            _conn = psycopg.connect(host=env["PGHOST"], port=int(os.environ.get("PGPORT", "5432")), dbname=os.environ.get("PGDATABASE", "databricks_postgres"),
+                                    user=env["PGUSER"], password=tok, sslmode="require", autocommit=True, row_factory=dict_row)
             _exp = time.time() + 40 * 60
         return _conn
 

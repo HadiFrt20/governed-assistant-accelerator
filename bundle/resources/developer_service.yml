@@ -1,0 +1,29 @@
+# Optional (models.developer in the config): the same governance for coding agents (Codex CLI, Claude Code, ...).
+resources:
+  model_services:
+    developer_service:
+      parent: schemas/${resources.schemas.assistant_schema.catalog_name}.${resources.schemas.assistant_schema.name}
+      model_service_id: ${var.developer_service}
+      comment: "${var.app_title} - agents de code ${var.owner_marker}"
+      config:
+        routing:
+          destinations:
+            - name: developer
+              destination_type: DESTINATION_TYPE_PAY_PER_TOKEN_FOUNDATION_MODEL
+              traffic_percentage: 100
+              pay_per_token_config:
+                model: models/${var.developer_model}
+        rate_limits:
+          - key: RATE_LIMIT_KEY_USER_DEFAULT
+            renewal_period: RATE_LIMIT_RENEWAL_PERIOD_MINUTE
+            requests: ${var.rate_limit_per_user}
+        inference_table:
+          parent: schemas/${resources.schemas.assistant_schema.catalog_name}.${resources.schemas.assistant_schema.name}
+          table_name_prefix: ${var.developer_service}
+      grants:
+        - principal: ${var.users_group}
+          privileges: [EXECUTE]
+
+variables:
+  developer_service: {description: "Model service id for coding agents"}
+  developer_model: {description: "Foundation model behind the developer service"}

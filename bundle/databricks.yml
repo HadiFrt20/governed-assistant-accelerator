@@ -1,0 +1,45 @@
+# Governed Assistant Accelerator: every workspace resource is declared here and deployed with Databricks Asset Bundles.
+# install/install.py renders this folder into build/<app>/ next to the generated app, SQL and dashboard, and writes the
+# variable values from config/<env>.yaml to .databricks/bundle/default/variable-overrides.json. Do not edit the build copy.
+# Not expressible in a bundle yet, applied and verified by install/install.py after deploy: model-service guardrail
+# policies (and the UC function behind the custom one), USE CATALOG on the existing catalog, volume folders, reference data.
+bundle:
+  name: governed-assistant
+
+include:
+  - resources/*.yml
+
+sync:
+  # build/ is git-ignored in the repository: list the generated folders explicitly or nothing is uploaded
+  include:
+    - app/**
+    - sql/**
+
+variables:
+  catalog: {description: "Existing Unity Catalog catalog (the assistant schemas are created inside)"}
+  schema: {description: "Schema for the model services, history mirror, gold layer and policy function"}
+  traces_schema: {description: "Schema for the MLflow trace tables only (the app identity may write there)"}
+  volume: {description: "Volume for library/, generated/ and uploads/"}
+  app_name: {description: "Databricks App name"}
+  app_title: {description: "Brand name shown in the workspace"}
+  warehouse_id: {description: "SQL warehouse for the usage job, the dashboard and trace queries"}
+  experiment_path: {description: "MLflow experiment path"}
+  lakebase_project: {description: "Lakebase project id (application state: conversations, files, search)"}
+  lakebase_catalog: {description: "UC catalog exposing the Lakebase database to the gold layer"}
+  assistant_service: {description: "Model service id of the office assistant"}
+  assistant_model: {description: "Foundation model behind the assistant service"}
+  users_group: {description: "Group allowed to open the app and call the services with its own identity (OBO)"}
+  rate_limit_per_user: {description: "Requests per user per minute on each model service"}
+  usage_cron: {description: "Quartz schedule of the usage refresh"}
+  timezone: {description: "Time zone of the usage schedule"}
+  owner_marker: {description: "Written in the comment of the model services: proves this accelerator manages them"}
+  user_api_scopes:
+    description: "OBO scopes of the app (empty list = the app calls everything with its own identity)"
+    type: complex
+
+targets:
+  default:
+    default: true
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${var.app_name}

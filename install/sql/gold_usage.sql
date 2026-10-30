@@ -45,7 +45,7 @@ SELECT event_time, DATE(event_time) AS jour, HOUR(event_time) AS heure, service_
        CASE WHEN service_name = '{assistant_fq}' THEN 'Bureautique'
             WHEN service_name = '{developer_fq}' THEN 'Développeur'
             WHEN service_name = 'system.ai.genie_one_mcp' THEN 'Genie One (données & documents)' END AS pilier,
-       CASE WHEN requester = '{sp}' THEN '{name_sql} (app)' ELSE requester END AS utilisateur,
+       CASE WHEN requester = (SELECT app_service_principal FROM {fq}.ref_deployment) THEN '{name_sql} (app)' ELSE requester END AS utilisateur,
        requester_type, auth_mode,
        COALESCE(request_tags['department'], CASE WHEN service_name = '{developer_fq}' THEN 'Développement' END, 'Non renseigné') AS service_metier,
        COALESCE(session_metadata.coding_agent, CASE WHEN service_name = '{developer_fq}' THEN 'agent de code' END) AS agent_code,
@@ -59,7 +59,7 @@ SELECT event_time, DATE(event_time) AS jour, HOUR(event_time) AS heure, service_
 FROM system.ai_gateway.usage
 WHERE workspace_id = '{workspace_id}'
   AND (service_name IN ('{assistant_fq}', '{developer_fq}')
-       OR (service_name = 'system.ai.genie_one_mcp' AND (requester = '{sp}' OR EXISTS (SELECT 1 FROM {fq}.stg_turns t
+       OR (service_name = 'system.ai.genie_one_mcp' AND (requester = (SELECT app_service_principal FROM {fq}.ref_deployment) OR EXISTS (SELECT 1 FROM {fq}.stg_turns t
             WHERE t.user_email = requester AND event_time BETWEEN t.created_at AND t.created_at + INTERVAL 15 MINUTES))));
 
 -- 4. Guardrail decisions. The gateway does not expose per-policy decisions in system tables or inference tables today,

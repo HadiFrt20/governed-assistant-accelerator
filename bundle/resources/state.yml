@@ -1,0 +1,23 @@
+resources:
+  postgres_projects:
+    # Lakebase: conversations, files, full-text / BM25 search. A new project comes with branch "production" and endpoint "primary".
+    history_project:
+      project_id: ${var.lakebase_project}
+      display_name: "${var.app_title} - état applicatif"
+      pg_version: 17
+
+  postgres_catalogs:
+    history_catalog:
+      catalog_id: ${var.lakebase_catalog}
+      branch: ${resources.postgres_projects.history_project.id}/branches/production
+      postgres_database: databricks_postgres
+
+  experiments:
+    traces_experiment:
+      name: ${var.experiment_path}
+      # traces go to Unity Catalog tables <catalog>.<traces_schema>.assistant_otel_* (Apps cannot reach the artifact store)
+      trace_location:
+        uc_trace_location:
+          catalog: ${resources.schemas.traces_schema.catalog_name}
+          schema: ${resources.schemas.traces_schema.name}
+          table_prefix: assistant

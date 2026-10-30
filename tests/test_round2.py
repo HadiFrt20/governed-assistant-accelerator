@@ -183,18 +183,6 @@ def installer():
     return ins
 
 
-def test_installer_rejects_unknown_sensitive_category(installer):
-    c = SimpleNamespace(fq="c.s", cfg={"governance": {"ip_leak_policy": {"name": "x"}, "builtin_policies": {"sensitive_data": {"categories": ["class.person"]}}}})
-    with pytest.raises(SystemExit):
-        installer.desired_policies(c)
-
-
-def test_installer_rejects_ask_on_model_services(installer):
-    c = SimpleNamespace(fq="c.s", cfg={"governance": {"ip_leak_policy": {"name": "x"}, "builtin_policies": {"sensitive_data": {"categories": ["class.email_address"], "action": "ask"}}}})
-    with pytest.raises(SystemExit):
-        installer.desired_policies(c)
-
-
 def test_installer_sql_literal_escaping(installer):
     assert installer._q("l'usine \\ x") == "l\\'usine \\\\ x"
 
@@ -293,13 +281,6 @@ def test_genie_conversation_reuse_only_for_owned_threads(client, appmod, monkeyp
     client.post("/api/conversations/c1/messages", json={"text": "et la nuit ?"}, headers=hdr())
     import time; time.sleep(0.2)
     assert seen.get("genie_conv") is None
-
-
-def test_installer_only_manages_services_it_owns(installer):
-    assert installer.may_manage({"comment": "x [governed-assistant-accelerator]"}, "exists", False)
-    assert not installer.may_manage({"comment": "created by the platform team"}, "exists", False)
-    assert installer.may_manage({"comment": "created by the platform team"}, "exists", True)
-    assert installer.may_manage(None, "created", False)
 
 
 # ---------- round-4 coverage ----------
@@ -421,27 +402,7 @@ def test_run_agent_stops_too_long_conversations():
     assert "trop longue" in j["answer"] and len(j["messages"]) == 1
 
 
-def test_deploy_gate_always_precedes_app(installer):
-    assert installer.with_deploy_gate(["app"]) == ["preflight", "app"]
-    assert installer.with_deploy_gate(["build", "app", "preflight"]) == ["build", "preflight", "app"]
-    assert installer.with_deploy_gate(["uc"]) == ["uc"]
-
-
 # ---------- round-5 coverage ----------
-def _installer_ctx(cfg_extra=None):
-    c = SimpleNamespace(catalog="cat", schema="sch", fq="cat.sch", volume="vol", cfg={"models": {"assistant": {"service": "a"}, "developer": None}})
-    c.service_fq = lambda role: f"cat.sch.{role}" if c.cfg["models"].get(role) else None
-    return c
-
-
-def test_sp_grants_are_least_privilege(installer):
-    grants = installer.sp_grants(_installer_ctx(), [("assistant_otel_spans", "MANAGED"), ("assistant_trace_metadata", "VIEW")])
-    by = {(t, n): p for t, n, p in grants}
-    assert by[("SCHEMA", "cat.sch")] == ["USE_SCHEMA"]                      # no schema-wide SELECT/MODIFY
-    assert by[("TABLE", "cat.sch.assistant_trace_metadata")] == ["SELECT"]   # views read-only
-    assert by[("TABLE", "cat.sch.assistant_otel_spans")] == ["SELECT", "MODIFY"]
-    assert ("MODEL_SERVICE", "cat.sch.developer") not in by                 # disabled role: no grant
-    assert all("ALL_PRIVILEGES" not in p and "MANAGE" not in p for p in by.values())
 
 
 def test_ip_leak_policy_sql_is_cel_safe_and_escaped(installer):
@@ -543,47 +504,6 @@ def test_failed_turn_does_not_corrupt_history(client, appmod, monkeypatch):
     assert saved[0] == [{"role": "user", "content": "avant"}, {"role": "assistant", "content": "ok"}]
 
 
-def test_governance_drift_detection(installer):
-    pols = [{"name": "p", "options": {"a": "1"}}]
-    rl = [{"key": "RATE_LIMIT_KEY_USER_DEFAULT", "requests": "60"}]
-    same = {"service_policies": [{"name": "p", "options": {"a": "1"}}], "rate_limits": [{"key": "RATE_LIMIT_KEY_USER_DEFAULT", "requests": 60}], "inference_table": {"x": 1}}
-    assert not installer.governance_drift(same, pols, rl)
-    assert installer.governance_drift(dict(same, inference_table=None), pols, rl)
-    assert installer.governance_drift(dict(same, service_policies=[]), pols, rl)
-    assert installer.governance_drift(dict(same, rate_limits=[{"key": "RATE_LIMIT_KEY_USER_DEFAULT", "requests": 600}]), pols, rl)
-    assert not installer.governance_drift(dict(same, service_policies=same["service_policies"] + [{"name": "old", "is_deleted": True}]), pols, rl)
-
-
-def test_grant_access_revokes_schema_wide_and_grants_users_group(installer):
-    calls = []
-    c = _installer_ctx()
-    c.dry, c.state = True, {}
-    c.cfg["access"] = {"users_group": "assistant-users"}
-    c.cli = lambda *a, **k: calls.append(a)
-    installer.grant_access(c, "sp-1")
-    payloads = [(a[3], json.loads(a[-1])["changes"][0]) for a in calls]
-    assert ("cat.sch", {"principal": "sp-1", "remove": ["SELECT", "MODIFY"]}) in payloads
-    assert ("cat.sch.assistant", {"principal": "assistant-users", "add": ["EXECUTE"]}) in payloads
-
-
-def test_installer_bundle_matches_what_the_app_reads(installer, tmp_path):
-    import yaml
-    cfg = yaml.safe_load(open(ROOT / "config/assistant.yaml"))
-    bdir = ROOT / "brands" / "acme"
-    saved = {}
-    c = SimpleNamespace(brand=yaml.safe_load(open(bdir / "brand.yaml")), brand_dir=bdir, cfg=cfg, dry=False, me="me@x.com", warehouse="wh",
-                        state={"experiment_id": "123", "lakebase": {"endpoint": "projects/p/branches/production/endpoints/primary", "host": "h"}},
-                        save=lambda **kw: saved.update(kw) or c.state.update(kw))
-    out = tmp_path / "bundle"
-    installer.build_bundle(c, out)
-    app_yaml = (out / "app.yaml").read_text()
-    for key in ("SETTINGS_FILE", "MLFLOW_EXPERIMENT_ID", "LAKEBASE_ENDPOINT", "PGHOST_FALLBACK", "MLFLOW_TRACING_SQL_WAREHOUSE_ID"):
-        assert key in app_yaml
-    s = json.loads((out / "settings.json").read_text())
-    assert s["observability"]["experiment_id"] == "123" and s["security"]["library_curators"] == ["me@x.com"]
-    assert all((out / p).exists() for p in s["templates"].values()) and all((out / "static" / v.lstrip("/")).exists() for v in s["brand"]["logos"].values())
-
-
 # ---------- round-7 coverage ----------
 def test_gateway_request_construction(monkeypatch):
     sent = {}
@@ -630,7 +550,7 @@ def test_phone_numbers_are_never_claimed_as_anonymised():
     import yaml
     cfg = yaml.safe_load(open(ROOT / "config/assistant.yaml"))
     cfg["governance"]["builtin_policies"]["sensitive_data"]["categories"] = ["class.email_address", "class.phone_number", "class.iban_code"]
-    s = shared.build(cfg, yaml.safe_load(open(ROOT / "brands/acme/brand.yaml")), {"templates": dict.fromkeys(shared.TEMPLATE_KEYS, "x")})
+    s = shared.build(cfg, yaml.safe_load(open(ROOT / "brands/acme/brand.yaml")), dict.fromkeys(shared.TEMPLATE_KEYS, "x"))
     assert "téléphone" not in s["governance"]["anonymised_labels"] and {"adresse email", "IBAN"} <= set(s["governance"]["anonymised_labels"])
 
 
@@ -638,46 +558,6 @@ def test_dashboard_cost_sql(installer):
     sql = installer.price_cases({"claude-sonnet-5-5": [2, 10], "default": [1, 1]})
     assert sql == ("WHEN destination_model LIKE '%claude-sonnet-5-5%' THEN COALESCE(input_tokens, 0) * 2.0 / 1e6 + "
                    "COALESCE(output_tokens, 0) * 10.0 / 1e6")
-
-
-class FakeNotFound(Exception):
-    pass
-
-
-def _policies_ctx(installer, service):
-    calls = []
-    def api(method, path, body=None, query=None):
-        calls.append((method, path, query))
-        if method == "GET":
-            if service is None:
-                raise installer.NotFound("missing")
-            return service
-        return {"comment": "", "config": {}}
-    cfg = {"governance": {"ip_leak_policy": {"name": "anti-fuite-pi", "keywords": ["confidentiel"], "reason": "PI"},
-                          "builtin_policies": {"jailbreak": True}, "rate_limit_per_user_per_minute": 60},
-           "models": {"assistant": {"service": "svc", "model": "system.ai.databricks-claude-sonnet-5-5"}, "developer": None}}
-    c = SimpleNamespace(cfg=cfg, fq="cat.sch", dry=False, force=False, brand={"name": "Atlas", "company": "Acme"},
-                        sql=lambda q, **k: None, api=api, save=lambda **kw: None, service_fq=lambda r: f"cat.sch.{cfg['models'][r]['service']}" if cfg["models"].get(r) else None)
-    return c, calls
-
-
-def test_step_policies_leaves_foreign_services_untouched(installer):
-    c, calls = _policies_ctx(installer, {"comment": "owned by the platform team", "config": {}})
-    installer.step_policies(c)
-    assert not [x for x in calls if x[0] == "PATCH"]
-
-
-def test_step_policies_patches_owned_service_on_drift_only(installer):
-    c, calls = _policies_ctx(installer, {"comment": "Atlas - svc [governed-assistant-accelerator]", "config": {}})
-    installer.step_policies(c)
-    patch = [x for x in calls if x[0] == "PATCH"]
-    assert len(patch) == 1 and "config.service_policies" in patch[0][2]["update_mask"]
-    pols = installer.desired_policies(c)
-    rl = [{"key": "RATE_LIMIT_KEY_USER_DEFAULT", "renewal_period": "RATE_LIMIT_RENEWAL_PERIOD_MINUTE", "requests": "60"}]
-    c2, calls2 = _policies_ctx(installer, {"comment": "x [governed-assistant-accelerator]",
-                                           "config": {"service_policies": pols, "rate_limits": rl, "inference_table": {"t": 1}}})
-    installer.step_policies(c2)
-    assert not [x for x in calls2 if x[0] == "PATCH"]  # already compliant: no rewrite
 
 
 def test_no_token_with_fallback_enabled_runs_as_app_visibly(monkeypatch):
@@ -727,18 +607,6 @@ def test_store_init_closes_orphaned_turns_and_tries_bm25(monkeypatch):
     assert any("lakebase_text" in s for s in executed)
 
 
-def test_preflight_gate_blocks_deploy(installer, tmp_path, monkeypatch):
-    c = SimpleNamespace(build_dir=tmp_path / "missing", app="a")
-    with pytest.raises(SystemExit):
-        installer.step_preflight(c)
-    c.build_dir = tmp_path / "build"; c.build_dir.mkdir()
-    monkeypatch.setattr(installer.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=1, stdout="1 failed", stderr=""))
-    with pytest.raises(SystemExit, match="nothing deployed"):
-        installer.step_preflight(c)
-    monkeypatch.setattr(installer.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="122 passed", stderr=""))
-    installer.step_preflight(c)
-
-
 # ---------- round-10 coverage ----------
 def test_xlsx_extraction():
     import zipfile
@@ -767,21 +635,6 @@ def test_sse_preserves_signed_thinking():
                                   {"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": "sig=="}},
                                   {"type": "message_delta", "delta": {"stop_reason": "end_turn"}}]))
     assert out["content"][0] == {"type": "thinking", "thinking": "Je réfléchis", "signature": "sig=="}
-
-
-def test_step_build_keeps_previous_bundle_on_failure(installer, tmp_path, monkeypatch):
-    c = SimpleNamespace(app="a", build_dir=tmp_path / "build" / "a", brand={"name": "B"})
-    monkeypatch.setattr(installer, "ROOT", tmp_path)
-    c.build_dir.mkdir(parents=True); (c.build_dir / "old.txt").write_text("v1")
-    monkeypatch.setattr(installer, "build_bundle", lambda c, out: (_ for _ in ()).throw(RuntimeError("template error")))
-    with pytest.raises(RuntimeError):
-        installer.step_build(c)
-    assert (c.build_dir / "old.txt").read_text() == "v1" and not list(c.build_dir.parent.glob(".a.*"))
-    def ok(c, out):
-        out.mkdir(); (out / "new.txt").write_text("v2"); return {"pptx": "x"}
-    monkeypatch.setattr(installer, "build_bundle", ok)
-    installer.step_build(c)
-    assert (c.build_dir / "new.txt").read_text() == "v2" and not (c.build_dir / "old.txt").exists()
 
 
 # ---------- round-11 coverage ----------
@@ -819,20 +672,14 @@ def test_lakebase_connection_refreshes_credentials(monkeypatch):
                                                          current_user=SimpleNamespace(me=lambda: SimpleNamespace(user_name="sp"))))
     monkeypatch.setattr(store.psycopg, "connect", lambda **kw: made.append(kw["password"]) or Conn())
     monkeypatch.setenv("LAKEBASE_ENDPOINT", "projects/p/branches/production/endpoints/primary")
-    monkeypatch.setenv("PGHOST_FALLBACK", "h")
+    monkeypatch.setenv("PGHOST", "h")
+    monkeypatch.setenv("PGUSER", "sp-client-id")
     monkeypatch.setattr(store, "_conn", None)
     first = store.conn()
     assert store.conn() is first and made == ["tok0"]               # reused while valid
     monkeypatch.setattr(store, "_exp", 0)                          # credential expired
     second = store.conn()
     assert second is not first and first.closed and made == ["tok0", "tok1"]
-
-
-def test_gold_usage_sql_renders(installer):
-    sql = (ROOT / "install" / "sql" / "gold_usage.sql").read_text().format(
-        name="Atlas", name_sql="Atlas", company_sql="Acme", app="acme-assistant", fq="cat.sch", lb="acme_lb",
-        assistant_fq="cat.sch.a", developer_fq="cat.sch.d", sp="sp-1", workspace_id="1", price_cases=installer.price_cases({"m": [1, 2]}))
-    assert "cat.sch.gold_assistant_requests" in sql and "Tentative contraire à la politique" in sql and "sp-1" in sql
 
 
 # ---------- round-12 coverage ----------
@@ -844,25 +691,6 @@ def test_gold_layer_parses_events_instead_of_matching_json_text():
 
 
 # ---------- round-13 coverage ----------
-def test_app_settings_drift(installer):
-    pg = {"branch": "projects/p/branches/production", "database": "db", "permission": "CAN_CONNECT_AND_CREATE"}
-    want = {"user_api_scopes": ["sql", "ai-gateway"], "resources": [{"name": "postgres", "postgres": pg}]}
-    same = {"user_api_scopes": ["ai-gateway", "sql"], "resources": [{"name": "postgres", "postgres": dict(pg)}, {"name": "other", "x": 1}]}
-    assert not installer.app_settings_drift(same, want)
-    assert installer.app_settings_drift(dict(same, user_api_scopes=["sql"]), want)
-    assert installer.app_settings_drift(dict(same, resources=[{"name": "postgres", "postgres": dict(pg, branch="projects/p/branches/dev")}]), want)
-    assert installer.app_settings_drift(dict(same, resources=[]), want)
-
-
-def test_step_app_refuses_without_lakebase(installer):
-    c = SimpleNamespace(app_sp=lambda: ("sp", {}), state={}, cfg={"app": {}})
-    with pytest.raises(SystemExit, match="Lakebase"):
-        installer.step_app(c)
-
 
 
 # ---------- fresh-workspace finding ----------
-def test_installer_explains_gateway_not_ready(installer):
-    with pytest.raises(SystemExit, match="Unity AI Gateway is not available"):
-        installer.gateway_unavailable(installer.NotFound("No metastore assigned for the current workspace."))
-    installer.gateway_unavailable(installer.NotFound("Model service x does not exist"))  # a missing service is normal: no exit

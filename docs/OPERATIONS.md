@@ -2,7 +2,38 @@
 
 ## Déployer une modification
 
-Toujours par le contrôle préalable : l'étape `preflight` de l'installateur exécute la suite pytest (`tests/test_*.py`, Python 3.11, dépendances figées) sur le build exact qui va être déployé, avant l'étape `app`, même avec `--only app`. Un échec bloque le déploiement. En local : `tests/run_all.sh` exécute la suite pour chaque marque de `brands/`. Couvert : cloisonnement des chemins et des fichiers, droits de la bibliothèque, propriétaire des tours, CSP, origine des écritures, identité manquante, échec fermé de l'OBO, outils de l'agent, injection via documents, historique après blocage, reprise après coupure, décodage SSE, détection des données sensibles, prix, rendu Office et HTML, marquage IA, image de marque sans fuite d'une marque à l'autre. Après le déploiement, un test de santé interroge `/api/config` avec quelques tentatives pendant le redémarrage.
+Toujours par `install/install.py` (jamais `databricks bundle deploy` à la main dans `build/` : les politiques des model services ne seraient pas réappliquées). Commencez par `--plan` : il affiche ce que le bundle va créer, modifier ou supprimer, sans rien changer.
+
+La phase `build` exécute la suite pytest (`tests/test_*.py`, Python 3.11, dépendances figées) sur le build exact qui va être déployé. Un échec bloque le déploiement. En local : `tests/run_all.sh` exécute la suite pour chaque marque de `brands/`. Couvert : cloisonnement des chemins et des fichiers, droits de la bibliothèque, propriétaire des tours, CSP, origine des écritures, identité manquante, échec fermé de l'OBO, outils de l'agent, injection via documents, historique après blocage, reprise après coupure, décodage SSE, détection des données sensibles, prix, rendu Office et HTML, marquage IA, image de marque sans fuite d'une marque à l'autre, et le déploiement lui-même : validation de la configuration, variables du bundle, droits minimaux de l'app, refus d'un plan destructeur, détection des conflits de noms, échec fermé si les politiques ne tiennent pas.
+
+La phase `verify` prouve le déploiement en conditions réelles : santé de l'app, blocage par la politique anti-fuite et anti-jailbreak, anonymisation d'un e-mail, une demande de bout en bout, spans dans les tables de traces UC, job d'usage exécuté et couche gold non vide.
+
+### En cas d'échec
+
+Le message donne la phase, la cause, la correction et la commande de reprise :
+
+```
+DEPLOYMENT STOPPED in phase « deploy »
+  what : existing objects with the bundle's names
+  cause: resources.schemas.assistant_schema: main.acme_assistant
+  fix  : either rename them in the config, delete them, or adopt them into this bundle:
+  (cd build/acme-assistant && databricks bundle deployment bind assistant_schema 'main.acme_assistant' -p DEFAULT --auto-approve)
+  resume: install/install.py --config config/assistant.yaml --from deploy
+```
+
+| Cas | Comportement |
+|---|---|
+| Erreur passagère (429, 5xx, délai, politique « could not be evaluated ») | nouvelle tentative avec attente croissante, puis arrêt |
+| Objet existant hors bundle (même nom) | arrêt avant tout changement, commande `bind` proposée |
+| Plan qui supprime ou recrée l'historique, un schéma, le volume ou l'expérience | arrêt, sauf `--allow-destructive` |
+| Politiques non relues à l'identique après écriture | `EXECUTE` retiré aux utilisateurs et à l'app sur les services (échec fermé), arrêt ; la reprise `--from govern` les rétablit |
+| App qui ne démarre pas | état du calcul et du déploiement dans le message, puis `databricks apps logs <app>` |
+
+Journal complet : `build/<app>.deploy.log`. Bilan : `build/<app>.deploy.json`.
+
+Constaté avec la CLI 1.20 : un redéploiement sans changement affiche `update apps.assistant` et `update ...grants`. L'API des apps ne renvoie que les noms des variables d'environnement, pas leurs valeurs : la CLI voit une différence (ancienne valeur = nouvelle), et les droits qui référencent le principal de service de l'app suivent. Les valeurs réécrites sont identiques ; aucune ressource n'est recréée et les politiques restent en place (la phase `govern` le vérifie).
+
+`--destroy --yes` supprime le projet Lakebase en suppression douce : il reste récupérable 7 jours (`purge_time`), et son identifiant n'est pas réutilisable pendant ce délai. Pour réinstaller tout de suite, changez `app.name`.
 
 ## Lire une trace
 
@@ -26,7 +57,7 @@ Requête SQL sur les spans :
 ```sql
 SELECT trace_id, name, (end_time_unix_nano - start_time_unix_nano) / 1e9 AS secondes,
        attributes:cost_estimate_usd::double AS cout, attributes:decision::string AS decision
-FROM <catalog>.<schema>.assistant_otel_spans
+FROM <catalog>.<traces_schema>.assistant_otel_spans
 ORDER BY start_time_unix_nano DESC
 ```
 

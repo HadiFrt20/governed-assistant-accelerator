@@ -23,7 +23,7 @@ def build(brand_name, out):
         shutil.copy(bdir / f, out / "static/brand" / f)
     templates = office_templates.build(brand, bdir, out)
     import settings as shared_settings  # the installer's own builder: the tested build is the deployed build
-    settings = shared_settings.build(cfg, brand, {"templates": templates}, me="curator@example.com")
+    settings = shared_settings.build(cfg, brand, templates, me="curator@example.com")
     json.dump(settings, open(out / "settings.json", "w"), ensure_ascii=False, indent=1)
     return out
 

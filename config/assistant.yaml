@@ -1,20 +1,24 @@
 # Governed Assistant Accelerator: deployment settings (one file per environment).
-# Everything the installer creates and everything the app reads comes from here and from the brand pack.
+# Everything deployed (Databricks Asset Bundle in bundle/) and everything the app reads comes from here and from the brand pack.
 
 workspace:
-  profile: DEFAULT                 # Databricks CLI profile used by the installer (databricks auth login)
+  profile: DEFAULT                 # Databricks CLI profile used to deploy (databricks auth login -p <name>)
   warehouse_id: <warehouse-id>     # SQL warehouse for setup SQL, trace queries and the dashboard
 
 brand: acme                       # folder under brands/
 
 unity_catalog:
-  catalog: main                    # must exist; the installer creates the schema inside it
-  schema: acme_assistant
+  catalog: main                    # must exist; the bundle creates the schemas inside it
+  schema: acme_assistant           # model services, policy function, history mirror, gold layer
+  # traces_schema: acme_assistant_traces   # MLflow trace tables (default <schema>_traces): the only schema the app may write to
   volume: fichiers                # library/, generated/, uploads/ are created inside
 
 app:
   name: acme-assistant            # Databricks App name (lowercase, dashes)
   obo: true                       # run model, Genie One and SQL calls with the signed-in user's identity
+
+access:
+  users_group: account users      # may open the app and call the model services (EXECUTE); use a narrower group in production
 
 models:
   # Governed model services created in Unity AI Gateway. The office assistant uses `assistant`.
@@ -45,8 +49,9 @@ data:
   scope: "Décrivez ici les tables métier que Genie One peut interroger (ex. catalog.schema.table : contenu)."
 
 observability:
-  mlflow_experiment: /Shared/acme-assistant-traces   # linked to UC trace tables in <catalog>.<schema>, prefix `assistant`
+  mlflow_experiment: /Shared/acme-assistant-traces   # linked to UC trace tables <catalog>.<traces_schema>.assistant_*
   usage_job_cron: "0 5 * * * ?"   # hourly gold layer refresh (ai_classify of usages)
+  timezone: Europe/Paris
 
 pricing:                          # USD per million tokens (input, output); Anthropic list prices 2026-10, validate against your contract
   claude-sonnet-5-5: [2.0, 10.0]

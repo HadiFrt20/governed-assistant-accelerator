@@ -76,21 +76,24 @@ Les décisions des politiques n'apparaissent pas dans `system.ai_gateway.usage` 
 
 Par défaut (`security.trace_content: redacted`), les traces gardent le début des textes longs (documents, résultats d'outils, raisonnement) avec leur taille et une empreinte SHA-256, pas leur contenu intégral ; les journaux de l'app ne contiennent pas le contenu des documents. `trace_content: full` conserve tout (utile en recette, à réserver à un schéma à accès restreint). Les requêtes restent visibles dans les tables d'inférence et le tableau de bord : restreignez l'accès au schéma.
 
-## Droits accordés par l'installateur (install/install.py, étape app)
+## Droits accordés au déploiement
 
-Principal de service de l'application, au plus juste :
+Déclarés dans le bundle (`bundle/resources/*.yml`), donc relus et réappliqués à chaque déploiement ; un test vérifie qu'aucun autre droit n'est donné à l'app. Principal de service de l'application, au plus juste :
 
-| Objet | Droits | Pourquoi |
+| Objet | Droits | Où |
 |---|---|---|
-| Catalogue, schéma | `USE CATALOG`, `USE SCHEMA` | accès aux objets ci-dessous, pas de `SELECT`/`MODIFY` au niveau du schéma |
-| Volume `<volume>` | `READ VOLUME`, `WRITE VOLUME` | lire la bibliothèque, écrire `generated/` et `uploads/` |
-| Tables de traces `assistant_otel_*` | `SELECT`, `MODIFY` (vue `assistant_trace_metadata` : `SELECT`) | écriture des spans MLflow |
-| Services de modèles, fonction de politique | `EXECUTE` | appels quand l'OBO est désactivé ou en secours |
-| Expérience MLflow | `CAN_MANAGE` (entrée ajoutée, l'ACL existante n'est pas remplacée) | création des traces |
+| Catalogue | `USE CATALOG` | `install/install.py`, phase `govern` (le catalogue existe avant le bundle) |
+| Schéma `<schema>` | `USE SCHEMA` (pas de `SELECT`/`MODIFY` au niveau du schéma) | bundle |
+| Schéma `<traces_schema>` | `USE SCHEMA`, `SELECT`, `MODIFY` : seul endroit où l'app écrit des tables (spans MLflow) | bundle |
+| Volume `<volume>` | `READ VOLUME`, `WRITE VOLUME` | bundle |
+| Service de modèles de l'assistant | `EXECUTE` (appels quand l'OBO est désactivé ou en secours) | bundle |
+| Fonction de la politique personnalisée | `EXECUTE` | phase `govern` |
+| Expérience MLflow, warehouse, base Lakebase | `CAN_MANAGE`, `CAN_USE`, `CAN_CONNECT_AND_CREATE` | ressources de l'app dans le bundle (accordées par Databricks Apps) |
+
+Groupe `access.users_group` (par défaut `account users`) : `CAN_USE` sur l'app, `USE CATALOG` et `USE SCHEMA`, `EXECUTE` sur les services de modèles et sur la fonction de politique (avec l'OBO, les appels sont faits avec l'identité de l'utilisateur). En production, utilisez un groupe dédié plutôt que `account users`.
 
 Limite connue : les privilèges Unity Catalog sur un volume s'appliquent au volume entier, pas à un sous-dossier. Le principal de
 service peut donc techniquement écrire aussi dans `library/`. Pour séparer strictement, créez deux volumes (bibliothèque en lecture
 seule pour l'application, livrables en écriture) ; l'application contrôle déjà que seuls les `library_curators` publient dans la bibliothèque.
 
-Les utilisateurs n'ont besoin d'aucun droit sur le volume : l'application lit et sert les fichiers. Avec l'OBO, ils ont besoin de
-`EXECUTE` sur les services de modèles : renseignez `access.users_group` dans `config/assistant.yaml` pour que l'installateur l'accorde à un groupe.
+Les utilisateurs n'ont besoin d'aucun droit sur le volume : l'application lit et sert les fichiers.

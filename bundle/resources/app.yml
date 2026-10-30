@@ -1,0 +1,49 @@
+resources:
+  apps:
+    assistant:
+      name: ${var.app_name}
+      description: ${var.app_title}
+      source_code_path: ../app
+      user_api_scopes: ${var.user_api_scopes}
+      config:
+        command: [uvicorn, "app:app", --host, 0.0.0.0, --port, "$DATABRICKS_APP_PORT"]
+        env:
+          - {name: SETTINGS_FILE, value: settings.json}
+          - {name: MLFLOW_TRACKING_URI, value: databricks}
+          - {name: MLFLOW_EXPERIMENT_ID, value_from: traces}
+          - {name: MLFLOW_TRACING_SQL_WAREHOUSE_ID, value_from: warehouse}
+          - {name: LAKEBASE_ENDPOINT, value: "${resources.postgres_projects.history_project.id}/branches/production/endpoints/primary"}
+      # Databricks Apps grants the app identity these resources and injects them (PGHOST, PGUSER, PGDATABASE, ... for postgres)
+      resources:
+        - name: traces
+          experiment: {experiment_id: "${resources.experiments.traces_experiment.id}", permission: CAN_MANAGE}
+        - name: warehouse
+          sql_warehouse: {id: "${var.warehouse_id}", permission: CAN_USE}
+        - name: history
+          postgres:
+            branch: ${resources.postgres_projects.history_project.id}/branches/production
+            database: ${resources.postgres_projects.history_project.id}/branches/production/databases/databricks-postgres
+            permission: CAN_CONNECT_AND_CREATE
+      permissions:
+        - group_name: ${var.users_group}
+          level: CAN_USE
+
+  jobs:
+    usage_job:
+      name: ${var.app_name}-usage
+      max_concurrent_runs: 1
+      schedule:
+        quartz_cron_expression: ${var.usage_cron}
+        timezone_id: ${var.timezone}
+      tasks:
+        - task_key: refresh_gold
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../sql/gold_usage.sql
+
+  dashboards:
+    usage_dashboard:
+      display_name: "${var.app_title} - Usage et gouvernance IA"
+      file_path: ../dashboards/usage.lvdash.json
+      warehouse_id: ${var.warehouse_id}

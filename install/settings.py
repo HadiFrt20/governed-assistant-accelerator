@@ -1,5 +1,6 @@
-"""settings.json for the app, computed from config/assistant.yaml + brand.yaml + installer state. Pure function: no workspace calls,
-so tests and local builds can import it."""
+"""settings.json for the app, computed from config/assistant.yaml + brand.yaml + the generated Office templates. Pure function:
+no workspace calls, so tests and local builds can import it. Deployed ids (experiment, Lakebase host) are not in here: the
+bundle passes them to the app as environment variables (resources/app.yml)."""
 
 # Categories accepted by system.ai.detect_sensitive_data. An unknown value makes the policy unevaluable and the
 # gateway then fails closed on ALL traffic, so the installer refuses anything outside this list.
@@ -11,6 +12,11 @@ SENSITIVE_CATEGORIES = {
 # the built-in detector does not recognise every national phone format (French mobiles were not masked in tests): never claim it in the UI
 NOT_CLAIMED = {"class.phone_number"}
 TEMPLATE_KEYS = ("pptx", "docx_8d", "wordmark", "wordmark_on_dark")
+
+
+def traces_schema(cfg):
+    uc = cfg["unity_catalog"]
+    return uc.get("traces_schema") or f"{uc['schema']}_traces"
 
 
 def policy_descriptions(cfg):
@@ -29,14 +35,13 @@ def policy_descriptions(cfg):
     return pols
 
 
-def build(cfg, brand, state, me=None):
+def build(cfg, brand, templates, me=None):
     uc = cfg["unity_catalog"]
     catalog, schema, volume = uc["catalog"], uc["schema"], uc["volume"]
     fq, root = f"{catalog}.{schema}", f"/Volumes/{catalog}/{schema}/{volume}"
     sd = ((cfg["governance"].get("builtin_policies") or {}).get("sensitive_data")) or {}
     sec = cfg.get("security") or {}
-    lb = state.get("lakebase", {})
-    tpl = state.get("templates") or {}
+    tpl = templates or {}
     missing = [k for k in TEMPLATE_KEYS if k not in tpl]
     if missing:
         raise ValueError(f"Office templates missing from the build ({missing}): run the build step (install/office_templates.py)")
@@ -53,9 +58,7 @@ def build(cfg, brand, state, me=None):
         "governance": {"policies": policy_descriptions(cfg), "sensitive_categories": sd.get("categories", []),
                        "anonymised_labels": [SENSITIVE_CATEGORIES[x] for x in sd.get("categories", []) if x not in NOT_CLAIMED]},
         "pricing": cfg.get("pricing", {"default": [2.0, 10.0]}),
-        "observability": {"experiment_id": state.get("experiment_id", ""), "uc_trace_prefix": f"{fq}.assistant",
-                          "warehouse_id": cfg["workspace"]["warehouse_id"]},
-        "lakebase": {"endpoint": lb.get("endpoint"), "host": lb.get("host"), "database": lb.get("database", "databricks_postgres")},
+        "observability": {"uc_trace_prefix": f"{catalog}.{traces_schema(cfg)}.assistant", "warehouse_id": cfg["workspace"]["warehouse_id"]},
         "obo": bool(cfg["app"].get("obo", True)),
         "templates": {k: tpl[k] for k in TEMPLATE_KEYS},
         "security": {"obo_fallback_to_app": bool(sec.get("obo_fallback_to_app", False)),

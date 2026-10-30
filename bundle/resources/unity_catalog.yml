@@ -1,0 +1,31 @@
+resources:
+  schemas:
+    assistant_schema:
+      catalog_name: ${var.catalog}
+      name: ${var.schema}
+      comment: "${var.app_title} : services IA gouvernés, miroir de l'historique, couche gold d'usage"
+      grants:
+        - principal: ${resources.apps.assistant.service_principal_client_id}
+          privileges: [USE_SCHEMA]
+        - principal: ${var.users_group}
+          privileges: [USE_SCHEMA]
+    traces_schema:
+      catalog_name: ${var.catalog}
+      name: ${var.traces_schema}
+      comment: "${var.app_title} : traces MLflow (une trace par demande, tables créées par la liaison de l'expérience)"
+      grants:
+        # the app writes spans here and nowhere else in the catalog (tables are created by MLflow, so privileges are schema-level)
+        - principal: ${resources.apps.assistant.service_principal_client_id}
+          privileges: [USE_SCHEMA, SELECT, MODIFY]
+
+  volumes:
+    files:
+      catalog_name: ${resources.schemas.assistant_schema.catalog_name}
+      schema_name: ${resources.schemas.assistant_schema.name}
+      name: ${var.volume}
+      volume_type: MANAGED
+      comment: "Bibliothèque partagée (library/), livrables générés (generated/), pièces jointes (uploads/)"
+      grants:
+        # UC volume privileges are volume-wide; per-user confinement is enforced by the app (docs/SECURITY.md)
+        - principal: ${resources.apps.assistant.service_principal_client_id}
+          privileges: [READ_VOLUME, WRITE_VOLUME]

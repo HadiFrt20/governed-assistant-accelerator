@@ -1,0 +1,28 @@
+# Governed model service in Unity AI Gateway. The bundle schema has no field for guardrail policies yet, and updating a
+# model service through a bundle clears them: install/install.py re-applies and verifies them after every deploy.
+resources:
+  model_services:
+    assistant_service:
+      parent: schemas/${resources.schemas.assistant_schema.catalog_name}.${resources.schemas.assistant_schema.name}
+      model_service_id: ${var.assistant_service}
+      comment: "${var.app_title} - assistant bureautique ${var.owner_marker}"
+      config:
+        routing:
+          destinations:
+            - name: assistant
+              destination_type: DESTINATION_TYPE_PAY_PER_TOKEN_FOUNDATION_MODEL
+              traffic_percentage: 100
+              pay_per_token_config:
+                model: models/${var.assistant_model}
+        rate_limits:
+          - key: RATE_LIMIT_KEY_USER_DEFAULT
+            renewal_period: RATE_LIMIT_RENEWAL_PERIOD_MINUTE
+            requests: ${var.rate_limit_per_user}
+        inference_table:
+          parent: schemas/${resources.schemas.assistant_schema.catalog_name}.${resources.schemas.assistant_schema.name}
+          table_name_prefix: ${var.assistant_service}
+      grants:
+        - principal: ${var.users_group}
+          privileges: [EXECUTE]
+        - principal: ${resources.apps.assistant.service_principal_client_id}
+          privileges: [EXECUTE]
