@@ -28,11 +28,9 @@ SELECT id AS turn_id, conversation_id, user_email, COALESCE(department, 'Non ren
        -- requests blocked by a policy are never sent to a model again (ai_classify runs on the Databricks-hosted AI Functions model,
        -- inside the workspace but outside the model-service policies): they are labelled directly
        CASE WHEN exists(ev, e -> e.type = 'blocked') THEN 'Tentative contraire à la politique'
-            ELSE ai_classify(user_text, ARRAY('Rapport 8D / résolution de problème', 'Présentation PowerPoint',
-                                              'Compte rendu, note ou mail', 'Question sur les données de l’usine',
-                                              'Synthèse ou lecture de document')) END AS type_usage,
+            ELSE ai_classify(user_text, ARRAY({usage_labels})) END AS type_usage,
        CASE WHEN exists(ev, e -> e.type = 'blocked') THEN 'Non classé (bloqué)'
-            ELSE ai_classify(user_text, ARRAY('Qualité', 'Maintenance', 'Production', 'R&D / Ingénierie', 'Direction')) END AS metier_infere
+            ELSE ai_classify(user_text, ARRAY({domain_labels})) END AS metier_infere
 FROM {fq}.stg_turns
 WHERE status = 'done';
 
@@ -82,7 +80,7 @@ SELECT t.id AS turn_id, t.user_email, COALESCE(t.department, 'Non renseigné') A
        CASE WHEN e.tool IN ('genie', 'Genie One') THEN 'Genie One (MCP)' WHEN e.tool IN ('pptx', 'PowerPoint') THEN 'Génération PowerPoint'
             WHEN e.tool IN ('docx', 'Word') THEN 'Génération Word' ELSE e.tool END AS outil,
        COALESCE(regexp_replace(e.label, '^Lecture de [0-9]+ documents?$', 'Lecture de documents'),
-                CASE WHEN e.tool = 'Genie One' THEN 'Analyse des données de l\'usine' WHEN e.tool = 'PowerPoint' THEN 'Création de la présentation'
+                CASE WHEN e.tool = 'Genie One' THEN 'Analyse des {data_label_sql}' WHEN e.tool = 'PowerPoint' THEN 'Création de la présentation'
                      WHEN e.tool = 'Word' THEN 'Rédaction du document Word' END) AS action
 FROM {fq}.stg_turns t
 LATERAL VIEW explode(t.ev) x AS e

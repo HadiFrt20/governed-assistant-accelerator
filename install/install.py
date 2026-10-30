@@ -173,6 +173,25 @@ def ip_leak_sql(fq, keywords, reason, company):
     return (Path(__file__).parent / "sql" / "policy_ip_leak.sql").read_text().format(fq=fq, conditions=cond, reason=_q(reason), comment=_q(comment))
 
 
+DEFAULT_DATA_LABEL = "données de l'entreprise"  # same default as app/config.py
+
+
+def data_label(brand):
+    return brand.get("data_label") or DEFAULT_DATA_LABEL
+
+
+def classification_label_lists(brand):
+    """ai_classify labels of the gold layer, from the brand: its templates, its data domain and its departments (never another brand's)."""
+    usage = [t["name"] for t in brand.get("templates", [])] + ["Compte rendu, note ou mail", f"Question sur les {data_label(brand)}",
+                                                                "Synthèse ou lecture de document"]
+    return list(dict.fromkeys(usage)), list(dict.fromkeys(list(brand.get("departments", [])) + ["Direction"]))
+
+
+def classification_labels(brand):
+    """The same labels as SQL array literals."""
+    return tuple(", ".join(f"'{_q(x)}'" for x in xs) for xs in classification_label_lists(brand))
+
+
 def bundle_variables(cfg, brand):
     uc, models = cfg["unity_catalog"], cfg["models"]
     app = cfg["app"]["name"]
@@ -440,7 +459,9 @@ def render_bundle(c, out):
     sql = (Path(__file__).parent / "sql" / "gold_usage.sql").read_text().format(
         name=c.brand["name"], name_sql=_q(c.brand["name"]), company_sql=_q(c.brand["company"]), app=c.app, fq=c.fq, lb=c.vars["lakebase_catalog"],
         assistant_fq=c.service_fq("assistant"), developer_fq=c.service_fq("developer") if "developer" in c.roles else "__none__",
-        workspace_id=c.workspace_id, price_cases=price_cases(c.cfg.get("pricing", {})) or "WHEN false THEN 0.0")
+        workspace_id=c.workspace_id, price_cases=price_cases(c.cfg.get("pricing", {})) or "WHEN false THEN 0.0",
+        usage_labels=classification_labels(c.brand)[0], domain_labels=classification_labels(c.brand)[1],
+        data_label_sql=_q(data_label(c.brand)))
     (out / "sql" / "gold_usage.sql").write_text(sql, encoding="utf-8")
     import dashboard
     (out / "dashboards").mkdir()

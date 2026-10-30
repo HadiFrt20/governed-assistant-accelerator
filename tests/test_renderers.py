@@ -30,6 +30,11 @@ def test_docx_8d_matches_headings_with_punctuation_and_marks_ai():
     assert doc.core_properties.keywords == "contenu-genere-par-ia"
 
 
+def test_docx_8d_has_visible_ai_footer():
+    doc = Document(io.BytesIO(renderers.build_docx({"template": "8D", "title": "8D", "sections": [{"heading": "D1 Équipe", "paragraphs": ["x"]}]})))
+    assert all(renderers.AI_NOTICE in "\n".join(p.text for p in s.footer.paragraphs) for s in doc.sections)
+
+
 def test_docx_free_form_has_ai_footer():
     doc = Document(io.BytesIO(renderers.build_docx({"title": "Note", "sections": [{"heading": "Contexte", "paragraphs": [""]}]})))
     assert "généré par IA" in doc.sections[0].footer.paragraphs[0].text

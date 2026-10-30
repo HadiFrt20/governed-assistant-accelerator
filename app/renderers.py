@@ -175,6 +175,16 @@ def _d_code(heading):
     return m.group(1).upper() if m else None
 
 
+def _ai_footer(doc):
+    """Visible AI notice in the footer of every section (AI Act art. 50), whatever the template already carries there."""
+    for sec in doc.sections:
+        if AI_NOTICE in "\n".join(p.text for p in sec.footer.paragraphs):
+            continue
+        par = sec.footer.paragraphs[0] if not sec.footer.paragraphs[0].text.strip() else sec.footer.add_paragraph()
+        fr = par.add_run(AI_NOTICE)
+        fr.font.size, fr.font.color.rgb = Pt(7.5), DRGB(0x5F, 0x6B, 0x7A)
+
+
 def build_docx(spec: dict) -> bytes:
     """spec = {template: "8D"|null, title, meta?{key: value}, sections:[{heading, paragraphs[], bullets[], table?{columns,rows}}]}
     With template "8D", sections whose heading starts with D1..D8 replace the grey placeholder under that heading."""
@@ -219,8 +229,6 @@ def build_docx(spec: dict) -> bytes:
         hdr.add_run().add_picture(WORDMARK, height=Cm(0.55))
         hr = hdr.add_run(f"\t{spec.get('doc_type', 'Document')} · {config.SITE} · Diffusion interne")
         hr.font.size, hr.font.color.rgb = Pt(8), DRGB(0x5F, 0x6B, 0x7A)
-        fr = doc.sections[0].footer.paragraphs[0].add_run(AI_NOTICE)
-        fr.font.size, fr.font.color.rgb = Pt(7.5), DRGB(0x5F, 0x6B, 0x7A)
         doc.add_heading(spec.get("title", ""), 0)
         import datetime
         meta = doc.add_paragraph()
@@ -234,6 +242,7 @@ def build_docx(spec: dict) -> bytes:
             if sec.get("table"):
                 _add_docx_table(doc, sec["table"])
     _mark_ai(doc.core_properties)
+    _ai_footer(doc)
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()

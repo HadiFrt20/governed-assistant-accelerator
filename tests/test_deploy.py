@@ -284,3 +284,29 @@ def test_govern_applies_policies_and_reference_data(ctx):
 def test_gold_sql_reads_the_app_identity_from_reference_data():
     sql = (ROOT / "install" / "sql" / "gold_usage.sql").read_text()
     assert "{sp}" not in sql and "(SELECT app_service_principal FROM {fq}.ref_deployment)" in sql
+
+
+def test_data_label_default_matches_the_app():
+    assert f'B.get("data_label", "{ins.DEFAULT_DATA_LABEL}")' in (ROOT / "app" / "config.py").read_text()
+
+
+def test_gold_classification_labels_come_from_the_brand(ctx):
+    c = ctx()
+    out = c.build_dir.with_name("render")
+    out.mkdir(parents=True)
+    ins.render_bundle(c, out)
+    sql = (out / "sql" / "gold_usage.sql").read_text()
+    for t in c.brand["templates"]:
+        assert f"'{ins._q(t['name'])}'" in sql
+    assert ins._q(f"Question sur les {ins.data_label(c.brand)}") in sql and all(f"'{d}'" in sql for d in c.brand["departments"])
+    assert "données de l’usine" not in sql and "'Maintenance'" not in sql  # labels of the original manufacturing deployment
+
+
+def test_every_dashboard_query_is_fully_qualified():
+    import dashboard
+    ser = dashboard.build("cat.sch", "Atlas", "Acme", "Site", {"primary": "#123456", "primary_2": "#234567", "accent": "#345678"}, "Inter")
+    ser = json.loads(ser) if isinstance(ser, str) else ser
+    for ds in ser["datasets"]:
+        q = "".join(ds.get("queryLines") or [ds.get("query", "")])
+        for name in re.findall(r"(?i)\b(?:FROM|JOIN)\s+([A-Za-z_][\w.]*)", q):
+            assert name.count(".") == 2 or name.startswith("system."), f"{ds['displayName']}: {name} is not catalog.schema.table"

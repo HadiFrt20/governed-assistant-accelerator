@@ -72,6 +72,8 @@ uv run --python 3.11 --with-requirements requirements-dev.txt python install/ins
 | `start` | `bundle run` de l'app (déploiement du code et démarrage) |
 | `verify` | santé de l'app, blocage effectif (politique anti-fuite et anti-jailbreak), anonymisation d'un e-mail, une vraie demande de bout en bout, spans présents dans les tables de traces UC, exécution du job d'usage et couche gold non vide |
 
+Recette complète après déploiement (23 contrôles en conditions réelles) : `tests/live/acceptance.py`, voir [docs/OPERATIONS.md](docs/OPERATIONS.md).
+
 Un échec arrête le déploiement avec la phase, la cause, la correction et la commande de reprise (`--from <phase>`). Chaque commande et sa sortie sont dans `build/<app>.deploy.log` (jetons masqués), le bilan dans `build/<app>.deploy.json`. Les codes de sortie distinguent la phase (2 configuration ou contrôles, 3 build, 4 deploy, 5 govern, 6 start, 7 verify). Relancer est sans risque : toutes les étapes sont idempotentes. `--destroy --yes` supprime tout ce que le déploiement a créé.
 
 Point d'attention vérifié : une mise à jour d'un model service par le bundle **efface ses politiques** (le schéma du bundle n'a pas encore de champ pour elles). La phase `govern` les réapplique aussitôt et les relit ; si elles ne tiennent pas, l'installateur retire `EXECUTE` sur les services (échec fermé) avant de s'arrêter.

@@ -8,6 +8,27 @@ La phase `build` exécute la suite pytest (`tests/test_*.py`, Python 3.11, dépe
 
 La phase `verify` prouve le déploiement en conditions réelles : santé de l'app, blocage par la politique anti-fuite et anti-jailbreak, anonymisation d'un e-mail, une demande de bout en bout, spans dans les tables de traces UC, job d'usage exécuté et couche gold non vide.
 
+### Recette complète en conditions réelles
+
+Après un déploiement, `tests/live/acceptance.py` passe par l'app déployée comme un utilisateur, puis contrôle tout ce qu'il y a derrière (environ 30 minutes, 23 contrôles indépendants, rapport `build/<app>.acceptance.json`, code de sortie 1 si un contrôle échoue) :
+
+```bash
+uv run --python 3.11 --with-requirements requirements-dev.txt python tests/live/acceptance.py --config config/<env>.local.yaml [--only data,generators]
+```
+
+| Groupe | Contrôles |
+|---|---|
+| platform | en-têtes et CSP de la page, configuration, jeton OBO transmis |
+| security | écritures cross-site et origines étrangères refusées, limites de taille, sorties de chemin, types de fichiers, fichiers et pièces jointes d'autrui |
+| library | dépôt par un responsable, listing, téléchargement identique à l'octet, pas d'écrasement |
+| data | Genie One : chiffre égal au SQL de référence (table de démonstration `<schema>_demo`), lien Genie One, question de suivi dans la même conversation Genie |
+| documents | pièce jointe lue, document de la bibliothèque lu par l'agent |
+| generators | PowerPoint (modèle, graphiques natifs, marquage IA), Word 8D (sections D1 à D8, pied de page IA), page HTML (CSP sandbox, marquage IA, aucun script externe, couleurs de la marque) |
+| governance | e-mail et IBAN anonymisés, fuite de PI et jailbreak bloqués via l'app sans casser la conversation, service développeur gouverné |
+| history | renommer, épingler, recherche plein texte, suppression, liste des fichiers |
+| traces | spans attendus pour chaque demande dans les tables UC, coût enregistré |
+| gold | job d'usage, couche gold (livrables, blocages, outils, libellés de la marque), instantané des garde-fous, chaque requête du tableau de bord, table système Unity AI Gateway |
+
 ### En cas d'échec
 
 Le message donne la phase, la cause, la correction et la commande de reprise :

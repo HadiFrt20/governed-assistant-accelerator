@@ -18,9 +18,9 @@ DS_TECH = [
         "FROM __FQ__.gold_gateway_usage GROUP BY ALL ORDER BY p95_ms DESC"]},
     {"name": "ds_lat_llm", "displayName": "Latence LLM", "queryLines": [
         "SELECT DATE_TRUNC('HOUR', event_time) AS event_time, jour, percentile_approx(latency_ms, 0.5) AS p50_ms, percentile_approx(latency_ms, 0.95) AS p95_ms, ",
-        "AVG(ttfb_ms) AS ttfb_ms FROM gold_gateway_usage WHERE service_type = 'MODEL_SERVICE' AND modele IS NOT NULL GROUP BY ALL"]},
+        "AVG(ttfb_ms) AS ttfb_ms FROM __FQ__.gold_gateway_usage WHERE service_type = 'MODEL_SERVICE' AND modele IS NOT NULL GROUP BY ALL"]},
     {"name": "ds_tools", "displayName": "Outils de l'agent", "queryLines": [
-        "SELECT turn_id, user_email, service_declare, created_at, jour, outil, action FROM gold_agent_tools"]},
+        "SELECT turn_id, user_email, service_declare, created_at, jour, outil, action FROM __FQ__.gold_agent_tools"]},
     {"name": "ds_guard_cfg", "displayName": "Configuration des garde-fous", "queryLines": [
         "SELECT service, modele, politique, description, type_politique, implementation, phases, action, rang, limite_debit, table_inference ",
         "FROM __FQ__.ref_guardrail_config ORDER BY service, rang"]},
