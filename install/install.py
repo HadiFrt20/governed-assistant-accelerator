@@ -200,6 +200,14 @@ def ip_leak_sql(fq, keywords, reason, company):
     return (Path(__file__).parent / "sql" / "policy_ip_leak.sql").read_text().format(fq=fq, conditions=cond, reason=_q(reason), comment=_q(comment))
 
 
+def gateway_unavailable(error):
+    """A NotFound about the metastore (not about the service) means Unity AI Gateway is not active on this workspace yet."""
+    if "metastore" in str(error).lower():
+        raise SystemExit("Unity AI Gateway is not available on this workspace (\"No metastore assigned\" from the gateway, although Unity Catalog works).\n"
+                         "Check Settings > Previews (Unity AI Gateway / model services, Genie One) or wait for a newly created workspace to finish "
+                         "provisioning, then rerun: the steps already done are skipped.")
+
+
 def step_policies(c):
     ip = c.cfg["governance"]["ip_leak_policy"]
     kws = [k.lower() for k in ip["keywords"]]
@@ -219,7 +227,8 @@ def step_policies(c):
         comment = f"{c.brand['name']} - {svc} ({m['model'].split('.')[-1]}) {MARKER}"
         try:
             cur, status = c.api("GET", f"/api/2.1/unity-catalog/model-services/{fq}"), "skip"
-        except NotFound:
+        except NotFound as e:
+            gateway_unavailable(e)
             cur, status = None, "created"
             body = {"comment": comment,
                     "config": {"routing": {"destinations": [{"name": m["model"].split(".")[-1].removeprefix("databricks-"),

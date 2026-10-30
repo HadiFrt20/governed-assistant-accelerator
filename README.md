@@ -56,8 +56,11 @@ Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 2. Lancez :
 
 ```bash
-python3 install/install.py --config config/assistant.yaml
+# prérequis : Databricks CLI connecté (databricks auth login --profile <profil>) et uv (https://docs.astral.sh/uv/)
+uv run --python 3.11 --with-requirements requirements-dev.txt python install/install.py --config config/assistant.yaml
 ```
+
+Pour garder vos valeurs hors du dépôt, copiez la configuration en `config/<env>.local.yaml` (ignoré par git) et passez ce fichier à `--config`.
 
 L'installateur est idempotent. Il crée le schéma et le volume, les model services et leurs politiques, le projet Lakebase, l'expérience MLflow liée aux tables de traces UC, génère les modèles Office de la marque, déploie l'app avec ses droits (scopes OBO), le job d'usage et le tableau de bord. Avant de déployer l'app, il exécute la suite de tests sur le build exact (`preflight`, bloquant), puis un test de santé. Les model services existants ne sont modifiés que s'ils portent le marqueur de l'installateur (ou avec `--force`).
 
@@ -137,6 +140,6 @@ Voir [docs/OPERATIONS.md](docs/OPERATIONS.md) et [docs/SECURITY.md](docs/SECURIT
 
 A brandable internal "GPT-style" assistant that runs entirely inside Databricks. Every model call goes through Unity AI Gateway model services with guardrails (custom UC-function IP-leak policy, jailbreak, unsafe content, sensitive-data **redaction**), per-user rate limits and inference tables. Calls run with the signed-in user's identity (OBO). Data questions go to Genie One (MCP) and come back as a short answer plus a link to continue in Genie One. Attachments are read by the app. The assistant produces branded PowerPoint and Word files (including an 8D report) and interactive HTML pages rendered by an enforced design system. History, pins and BM25 search live in Lakebase. Every request is one MLflow trace stored in Unity Catalog tables, with per-call token counts and estimated cost. An AI/BI dashboard tracks adoption, `ai_classify`-classified usage, cost, blocks and latency.
 
-**Install:** fill in `config/assistant.yaml`, then `python3 install/install.py --config config/assistant.yaml`.
+**Install:** fill in `config/assistant.yaml`, then `uv run --python 3.11 --with-requirements requirements-dev.txt python install/install.py --config config/assistant.yaml` (keep real values in an untracked `config/<env>.local.yaml`).
 **New customer:** copy `brands/acme`, edit `brand.yaml`, swap the three logos, set `brand:` in the config, rerun the installer.
 **Known limits:** see the French section above (ASK only on MCP services; no person-name or French-ID redaction category; invalid redaction category fails closed for all traffic; large HTML pages take 3 to 6 minutes; list prices to validate).

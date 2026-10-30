@@ -858,3 +858,11 @@ def test_step_app_refuses_without_lakebase(installer):
     c = SimpleNamespace(app_sp=lambda: ("sp", {}), state={}, cfg={"app": {}})
     with pytest.raises(SystemExit, match="Lakebase"):
         installer.step_app(c)
+
+
+
+# ---------- fresh-workspace finding ----------
+def test_installer_explains_gateway_not_ready(installer):
+    with pytest.raises(SystemExit, match="Unity AI Gateway is not available"):
+        installer.gateway_unavailable(installer.NotFound("No metastore assigned for the current workspace."))
+    installer.gateway_unavailable(installer.NotFound("Model service x does not exist"))  # a missing service is normal: no exit
