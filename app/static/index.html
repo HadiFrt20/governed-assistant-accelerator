@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{BRAND}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=Titillium+Web:wght@600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="brand/{{FAVICON}}">
+<script src="vendor/marked.min.js"></script><script src="vendor/purify.min.js"></script>
+<style>
+:root{
+  --ink:#05072E; --navy:#1D1F46; --teal:#2E8B36; --teal-2:#3BA344; --teal-bg:#EAF6EB; --blue:#2EA3F2;
+  --bg:#FFFFFF; --side:#F7F8FA; --soft:#F2F4F7; --line:#E6E9EE; --line-2:#D9DEE5;
+  --muted:#667085; --muted-2:#98A2B3; --red:#B42318; --red-bg:#FEF3F2;
+  --ppt:#C4471F; --doc:#2B5DB8;
+  --r:12px; --shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:"Open Sans","Segoe UI",system-ui,sans-serif;font-size:14px;color:var(--ink);background:var(--bg);display:flex;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer}
+svg{flex-shrink:0}
+a{color:var(--teal)}
+/* ---------- sidebar ---------- */
+aside{width:264px;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.logo{display:flex;align-items:center;gap:10px;padding:18px 18px 16px}
+.logo img.wmk{height:19px;display:block}
+.logo .wm{line-height:1}
+.logo .wm small{display:block;font-family:'Titillium Web',sans-serif;font-weight:600;font-size:12.5px;color:var(--teal);letter-spacing:.8px;text-transform:uppercase;margin-top:6px}
+.new{margin:0 12px 8px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line-2);border-radius:10px;padding:9px 12px;color:var(--ink);font-weight:500;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.new:hover{border-color:var(--teal)}
+.new kbd{margin-left:auto;font:11px Inter;color:var(--muted-2)}
+nav{padding:4px 8px}
+nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:#344054;text-decoration:none;cursor:pointer;font-weight:500}
+nav a:hover{background:#EEF1F4}
+nav a.on{background:#E9EEF3;color:var(--navy)}
+nav a svg{color:var(--muted)}
+.hist{flex:1;overflow-y:auto;padding:6px 8px 12px}
+.srch{margin:6px 12px 2px;position:relative}
+.srch input{width:100%;border:1px solid var(--line-2);border-radius:9px;padding:8px 10px 8px 32px;font:inherit;font-size:13px;background:#fff;outline:none}
+.srch input:focus{border-color:var(--teal-2)}
+.srch svg{position:absolute;left:10px;top:9px;color:var(--muted-2)}
+.eng{font-size:11px;color:var(--teal);padding:10px 10px 4px;display:flex;align-items:center;gap:6px;font-weight:600}
+.sr{padding:8px 10px;border-radius:8px;cursor:pointer}
+.sr:hover{background:#EEF1F4}
+.sr b{display:block;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sr span{display:block;font-size:12px;color:var(--muted);line-height:1.4;margin-top:2px;max-height:34px;overflow:hidden}
+.sr mark{background:#E1F2E3;color:var(--ink);padding:0 1px;border-radius:2px}
+.ci .pin{display:none;border:none;background:none;color:var(--muted-2);padding:2px;border-radius:4px}
+.ci:hover .pin{display:block}.ci .pin:hover{color:var(--ink);background:#E1E6EC}
+.ci .pin.on{display:block;color:var(--teal)}
+.pinbtn{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 10px;font-size:12.5px;color:#475467;font-weight:500}
+.pinbtn.on{color:var(--teal);border-color:#BFE3C3;background:var(--teal-bg)}
+.grp{font-size:11.5px;font-weight:600;color:var(--muted-2);padding:14px 10px 6px}
+.ci{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;cursor:pointer;color:#344054}
+.ci:hover{background:#EEF1F4}
+.ci.on{background:#E9EEF3;color:var(--navy);font-weight:500}
+.ci .t{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ci .x{display:none;border:none;background:none;color:var(--muted-2);padding:2px;border-radius:4px}
+.ci:hover .x{display:block}.ci .x:hover{color:var(--ink);background:#E1E6EC}
+.me{border-top:1px solid var(--line);padding:12px 14px;display:flex;align-items:center;gap:10px}
+.av{width:32px;height:32px;border-radius:50%;background:var(--teal-bg);color:var(--teal);display:grid;place-items:center;font-weight:600;font-size:12.5px}
+.me .n{font-weight:600;font-size:13px}.me .s{font-size:12px;color:var(--muted)}
+/* ---------- main ---------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{height:56px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 24px;gap:12px}
+.top .tt{font-weight:600;font-size:14.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.gov{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--teal);background:var(--teal-bg);padding:5px 10px;border-radius:20px;font-weight:500}
+.scroll{flex:1;overflow-y:auto}
+.col{max-width:780px;margin:0 auto;padding:28px 24px 40px}
+/* ---------- home ---------- */
+.hero{padding-top:6vh;text-align:center}
+.hero h1{font-family:'Titillium Web',sans-serif;font-size:34px;font-weight:700;letter-spacing:-.3px;margin:0 0 8px;color:var(--navy)}
+.hero p{color:var(--muted);font-size:15px;margin:0 0 26px}
+.seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;gap:2px;margin:22px 0 6px}
+.seg button{border:none;background:none;padding:6px 14px;border-radius:8px;color:#475467;font-weight:500;font-size:13px}
+.seg button.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(16,24,40,.1)}
+.lbl{font-size:12.5px;font-weight:600;color:var(--muted);margin:26px 0 10px;text-align:left}
+.tpls{display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left}
+.tpl{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:var(--r);padding:14px;cursor:pointer;background:#fff;transition:.15s}
+.tpl:hover{border-color:var(--teal);box-shadow:var(--shadow)}
+.tpl b{display:block;font-weight:600;margin-bottom:3px}
+.tpl span{color:var(--muted);font-size:12.5px;line-height:1.45}
+.ficon{width:30px;height:36px;border-radius:4px;display:grid;place-items:end center;padding-bottom:5px;color:#fff;font-weight:700;font-size:8px;letter-spacing:.2px;position:relative;flex-shrink:0}
+.ficon.pptx{background:var(--ppt)}.ficon.docx{background:var(--doc)}.ficon.pdf{background:#B42318}.ficon.other{background:#667085}.ficon.html{background:#3BA344}
+.ficon:after{content:"";position:absolute;top:0;right:0;border-width:0 9px 9px 0;border-style:solid;border-color:#fff #fff rgba(255,255,255,.45) rgba(255,255,255,.45)}
+.sug{display:flex;flex-direction:column;gap:6px;text-align:left}
+.sug button{display:flex;align-items:center;gap:10px;text-align:left;border:none;background:none;padding:9px 10px;border-radius:8px;color:#344054}
+.sug button:hover{background:var(--soft)}
+.sug svg{color:var(--muted-2)}
+/* ---------- composer ---------- */
+.composer{border:1px solid var(--line-2);border-radius:16px;background:#fff;box-shadow:var(--shadow);padding:10px 10px 10px 14px;text-align:left}
+.composer:focus-within{border-color:var(--teal)}
+.composer textarea{width:100%;border:none;outline:none;resize:none;font:inherit;font-size:15px;line-height:1.5;min-height:26px;max-height:200px;padding:4px 0}
+.composer .bar{display:flex;align-items:center;gap:6px;margin-top:6px}
+.ib{width:34px;height:34px;border-radius:9px;border:none;background:none;color:var(--muted);display:grid;place-items:center}
+.ib:hover{background:var(--soft);color:var(--ink)}
+.go{margin-left:auto;width:34px;height:34px;border-radius:9px;border:none;background:var(--navy);color:#fff;display:grid;place-items:center}
+.go:disabled{background:#C8CFD8}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:flex;align-items:center;gap:6px;background:var(--soft);border-radius:8px;padding:4px 8px;font-size:12.5px}
+.chip button{border:none;background:none;color:var(--muted);padding:0}
+.dock{padding:0 24px 18px}.dock .composer{max-width:732px;margin:0 auto}
+.foot{font-size:11.5px;color:var(--muted-2);text-align:center;margin-top:8px}
+/* ---------- conversation ---------- */
+.msg-u{display:flex;justify-content:flex-end;margin:4px 0 22px}
+.msg-u .b{background:var(--soft);border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:80%;white-space:pre-wrap;line-height:1.5}
+.msg-u .att{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.msg-a{display:flex;gap:12px;margin:0 0 30px}
+.msg-a .ava{width:30px;height:30px;border-radius:50%;background:#fff;border:1px solid var(--line);display:grid;place-items:center;margin-top:1px}.msg-a .ava img{height:15px}
+.msg-a .body{flex:1;min-width:0}
+.act{border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden}
+.act-h{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;color:#475467;font-size:13px;user-select:none}
+.act-h .chev{margin-left:auto;transition:.2s;color:var(--muted-2)}
+.act.open .chev{transform:rotate(180deg)}
+.act-b{display:none;border-top:1px solid var(--line);padding:6px 12px 10px;background:#FCFCFD}
+.act.open .act-b{display:block}
+.stp{display:flex;gap:10px;padding:8px 0;font-size:13px}
+.stp .dot{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;margin-top:1px}
+.stp .dot.ok{background:var(--teal-bg);color:var(--teal)}
+.stp .dot.run{border:2px solid var(--teal-2);border-right-color:transparent;animation:sp .8s linear infinite}
+.stp .dot.err{background:var(--red-bg);color:var(--red)}
+.stp b{font-weight:600}
+.stp .d{color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.45}
+.stp .docs{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.gans{margin-top:6px;font-size:12.5px;color:#344054;max-height:260px;overflow:auto;border-left:2px solid var(--line);padding-left:10px}
+.gans table{border-collapse:collapse;font-size:12px}.gans td,.gans th{border:1px solid var(--line);padding:2px 6px}
+.gans a{font-size:12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.live{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin-bottom:12px}
+.live .s{width:14px;height:14px;border:2px solid var(--teal-2);border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite}
+.blocked{display:flex;gap:10px;background:var(--red-bg);border:1px solid #FECDCA;color:var(--red);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13.5px}
+.handoff{display:flex;align-items:center;gap:12px;margin:12px 0 4px;padding:12px 14px;border:1px solid #CFE8D2;background:#F3FAF4;border-radius:12px;text-decoration:none;color:inherit;max-width:520px;transition:.15s}
+.handoff:hover{border-color:var(--green,#3BA344);box-shadow:var(--shadow)}
+.handoff .hi{width:34px;height:34px;border-radius:9px;background:#fff;border:1px solid #CFE8D2;display:grid;place-items:center;color:#3BA344;flex-shrink:0}
+.handoff .ht{display:flex;flex-direction:column;gap:2px;font-size:13.5px}.handoff .ht small{color:var(--muted);font-size:12.5px}
+.handoff .ha{margin-left:auto;color:var(--muted-2)}
+.trc{display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);text-decoration:none}.trc:hover{color:var(--teal)}
+.masked{display:flex;gap:10px;background:#F3FAF4;border:1px solid #CFE8D2;color:#1E6B2A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px}
+.ailbl{display:inline-block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-bottom:8px}
+.prose{line-height:1.62;font-size:14.5px}
+.prose p{margin:0 0 10px}.prose ul,.prose ol{margin:0 0 10px;padding-left:20px}.prose li{margin:3px 0}
+.prose h1,.prose h2,.prose h3{font-size:15px;margin:14px 0 6px}
+.prose table{border-collapse:collapse;font-size:13px;margin:8px 0}.prose td,.prose th{border:1px solid var(--line);padding:4px 8px}
+.prose strong{font-weight:600}
+/* doc card */
+.doc{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:2px 0 16px;background:#fff;box-shadow:var(--shadow)}
+.doc-h{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.doc-h .ti{font-weight:600;font-size:14px;line-height:1.35}
+.doc-h .me2{font-size:12px;color:var(--muted);margin-top:2px}
+.dl{margin-left:auto;display:flex;align-items:center;gap:6px;background:var(--navy);color:#fff;border-radius:9px;padding:8px 12px;text-decoration:none;font-weight:500;font-size:13px;white-space:nowrap}
+.dl:hover{background:#123E66}
+.strip{display:flex;gap:10px;overflow-x:auto;padding:12px 14px 14px;background:var(--soft);border-top:1px solid var(--line)}
+.sl{flex:0 0 168px;height:94.5px;background:#fff;border-radius:6px;box-shadow:0 1px 2px rgba(16,24,40,.12);position:relative;overflow:hidden;padding:9px 8px 6px}
+.sl:before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:#05072E}.sl:after{content:"";position:absolute;top:21px;left:8px;width:16px;height:1.5px;background:#3BA344}
+.sl .st{font-size:6.6px;font-weight:700;color:#1D1F46;line-height:1.25;max-height:17px;overflow:hidden}
+.sl .sb{position:absolute;left:8px;top:28px;width:56px}
+.sl .sb i{display:block;height:3px;background:#E3E7EC;border-radius:2px;margin:0 0 4px}
+.sl .sb i:first-child{background:#C9CBE0}
+.sl .sv{position:absolute;right:7px;top:26px;width:92px;height:58px}
+.sl.cover{display:flex;flex-direction:column;justify-content:center;padding:10px 12px 10px 62px;background:linear-gradient(90deg,#05072E 0 33%,#3BA344 33% 34%,#fff 34%)}.sl.cover:before{display:none}.sl.cover:after{display:none}
+.sl.cover .st{font-size:8.5px;max-height:none}.sl.cover .ss{font-size:6px;color:#5F6B7A;margin-top:3px}
+.sl .n{position:absolute;bottom:3px;right:6px;font-size:6px;color:#98A2B3}
+.page{display:flex;gap:14px;padding:12px 14px 14px;background:var(--soft);border-top:1px solid var(--line)}
+.pg{width:118px;height:150px;background:#fff;border-radius:4px;box-shadow:0 1px 2px rgba(16,24,40,.12);padding:12px 10px;flex-shrink:0}
+.pg .h{height:6px;width:70%;background:#1D1F46;border-radius:2px;margin-bottom:8px}
+.pg i{display:block;height:3px;background:#E3E7EC;border-radius:2px;margin:0 0 5px}
+.pg i.s{width:45%;background:#9DB4E0;margin-top:8px}
+.outl{flex:1;font-size:12.5px;color:#344054;columns:2;column-gap:20px}
+.outl div{display:flex;gap:6px;align-items:center;padding:3px 0;break-inside:avoid}
+.outl svg{color:var(--teal)}
+/* lists */
+.ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+.ph h1{font-family:'Titillium Web',sans-serif;font-size:26px;font-weight:700;margin:0;color:var(--navy)}
+.ph p{color:var(--muted);margin:4px 0 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.fc{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;cursor:pointer;transition:.15s;text-decoration:none;color:inherit}
+.fc:hover{box-shadow:var(--shadow);border-color:var(--line-2)}
+.fc .th{height:128px;background:var(--soft);display:grid;place-items:center;border-bottom:1px solid var(--line)}
+.fc .th .sl{transform:scale(1.15)}
+.fc .th .pg{height:110px;width:88px}
+.fc .inf{padding:10px 12px}
+.fc .inf b{display:block;font-weight:600;font-size:13px;line-height:1.35;max-height:36px;overflow:hidden}
+.fc .inf span{font-size:12px;color:var(--muted)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-2);background:#fff;border-radius:9px;padding:7px 12px;font-weight:500;font-size:13px;color:var(--ink);text-decoration:none}
+.btn:hover{border-color:var(--teal)}
+.btn.p{background:var(--navy);color:#fff;border-color:var(--navy)}
+.lib{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.lr{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line)}
+.lr:first-child{border-top:none}
+.lr .nm{flex:1;font-weight:500}.lr .nm small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.lr .acts{display:flex;gap:6px;opacity:.0;transition:.15s}.lr:hover .acts{opacity:1}
+.fchips{display:flex;gap:6px;margin-bottom:14px}
+.fchips button{border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 12px;font-size:12.5px;color:#475467}
+.fchips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.empty{text-align:center;color:var(--muted);padding:60px 0}
+</style>
+</head>
+<body>
+<aside>
+  <div class="logo"><div class="wm"><img class="wmk" src="brand/{{WORDMARK}}" alt="{{COMPANY}}"><small>Assistant</small></div></div>
+  <button class="new" onclick="home()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Nouvelle conversation</button>
+  <nav>
+    <a id="n-files" onclick="filesView()"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></svg>Mes documents</a>
+    <a id="n-lib" onclick="libraryView()"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>Bibliothèque {{COMPANY}}</a>
+  </nav>
+  <div class="srch"><span id="sicon"></span><input id="sq" placeholder="Rechercher dans mes conversations" autocomplete="off"></div>
+  <div class="hist" id="hist"></div>
+  <div class="me" id="me"></div>
+</aside>
+<div class="main">
+  <div class="top" id="top"><div class="tt" id="tt"></div><span id="pinslot"></span>
+    <div class="gov"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>Données et IA gouvernées · {{COMPANY}}</div></div>
+  <div class="scroll" id="scroll"><div class="col" id="view"></div></div>
+  <div class="dock" id="dock"></div>
+</div>
+<input type="file" id="fileIn" hidden accept=".docx,.pdf,.pptx,.xlsx,.csv,.txt" onchange="attach(this.files[0]); this.value=''">
+<script>
+const I = {
+  genie:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>',
+  ext:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+  trace:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h10M8 12h12M4 18h8"/></svg>',
+  send:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  clip:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m21 11-8.6 8.6a5 5 0 0 1-7-7L14 4a3.3 3.3 0 0 1 4.7 4.7L10 17.3a1.7 1.7 0 0 1-2.3-2.4L15.6 7"/></svg>',
+  check:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5 9-10"/></svg>',
+  chev:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
+  dl:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>',
+  pin:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v5M9 3h6l-1 6 4 4H6l4-4-1-6Z"/></svg>',
+  search:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  x:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  arrow:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>',
+  bolt:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" fill="#00C2B2"/></svg>',
+  shield:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3Z"/><path d="M12 8v5m0 3h.01"/></svg>',
+};
+let CFG, conv = null, dept = localStorage.getItem('dept'), pending = [], busy = false;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api = (u, o) => fetch(u, o).then(async r => {   // never throws on a non-JSON error page: callers always get an object
+  const t = await r.text();
+  try { return JSON.parse(t); } catch (e) { return {error: r.ok ? 'Réponse illisible du service' : `Le service a répondu ${r.status}. Réessayez dans un instant.`}; }
+}).catch(() => ({error: 'Service injoignable. Vérifiez votre connexion et réessayez.'}));
+const ext = n => (n.split('.').pop() || '').toLowerCase();
+const md = x => DOMPurify.sanitize(marked.parse(String(x || '')), {FORBID_TAGS: ['style', 'form', 'input'], FORBID_ATTR: ['style']});
+const jsarg = v => esc(JSON.stringify(v));            // for onclick="f(${jsarg(v)})": quotes become entities, decoded before the JS runs
+const safeUrl = u => /^https:\/\//.test(u || '') ? u : '#';
+DOMPurify.addHook('afterSanitizeAttributes', n => { if (n.tagName === 'A') { n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener noreferrer'); } });
+const ficon = (k, big) => `<div class="ficon ${['pptx','docx','pdf','html'].includes(k) ? k : 'other'}" ${big ? '' : ''}>${k === 'pptx' ? 'PPT' : k === 'docx' ? 'DOC' : k === 'html' ? 'WEB' : k.toUpperCase().slice(0,4)}</div>`;
+const prettyName = n => n.replace(/^[0-9a-f]{6}_/, '').replace(/\.[^.]+$/, '').replace(/_+/g, ' ');
+const fmt = d => new Date(d).toLocaleDateString('fr-FR', {day:'numeric', month:'short'}) + ' · ' + new Date(d).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+
+async function boot() {
+  CFG = await api('/api/config');
+  const ini = CFG.name.split(' ').map(w => w[0]).join('').slice(0, 2);
+  $('me').innerHTML = `<div class="av">${esc(ini)}</div><div><div class="n">${esc(CFG.name)}</div><div class="s">${esc(dept || '{{COMPANY}}')} · {{SITE_SHORT}}</div></div>`;
+  wireSearch(); loadHist(); route();
+}
+function route() { const h = location.hash; if (h.startsWith('#c/')) openConv(h.slice(3)); else if (h === '#documents') filesView(); else if (h === '#bibliotheque') libraryView(); else home(); }
+function nav(id) { document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.id === id)); }
+function title(t) { $('tt').textContent = t || ''; if (!conv && $('pinslot')) $('pinslot').innerHTML = ''; }
+
+let HIST = [];
+async function loadHist() {
+  if ($('sq') && $('sq').value.trim()) return;
+  HIST = await api('/api/conversations');
+  const now = new Date(), groups = {};
+  HIST.forEach(c => { const d = (now - new Date(c.updated_at)) / 864e5;
+    const g = c.pinned ? 'Épinglées' : d < 1 && new Date(c.updated_at).getDate() === now.getDate() ? "Aujourd'hui" : d < 7 ? '7 derniers jours' : 'Plus ancien';
+    (groups[g] ||= []).push(c); });
+  const order = ['Épinglées', "Aujourd'hui", '7 derniers jours', 'Plus ancien'];
+  $('hist').innerHTML = order.filter(g => groups[g]).map(g => `<div class="grp">${g}</div>` + groups[g].map(c =>
+    `<div class="ci ${c.id === conv ? 'on' : ''}" onclick="openConv(${jsarg(c.id)})"><span class="t">${esc(c.title)}</span>
+     <button class="pin ${c.pinned ? 'on' : ''}" title="${c.pinned ? 'Désépingler' : 'Épingler'}" onclick="event.stopPropagation();pin(${jsarg(c.id)}, ${!c.pinned})">${I.pin}</button>
+     <button class="x" title="Supprimer" onclick="event.stopPropagation();del(${jsarg(c.id)})">${I.x}</button></div>`).join('')).join('');
+  pinSlot();
+}
+async function pin(id, on) {
+  await fetch(`/api/conversations/${id}`, {method:'PATCH', headers:{'content-type':'application/json'}, body:JSON.stringify({pinned:on})});
+  if (id === conv) pinSlot({id, pinned:on});
+  if ($('sq').value.trim()) runSearch(); else loadHist();
+}
+function pinSlot(cur) {
+  const c = cur || HIST.find(x => x.id === conv);
+  $('pinslot').innerHTML = c ? `<button class="pinbtn ${c.pinned ? 'on' : ''}" onclick="pin(${jsarg(c.id)}, ${!c.pinned})">${I.pin}${c.pinned ? 'Épinglée' : 'Épingler'}</button>` : '';
+}
+let sTimer = null;
+function wireSearch() {
+  $('sicon').innerHTML = I.search;
+  $('sq').addEventListener('input', () => { clearTimeout(sTimer); sTimer = setTimeout(runSearch, 250); });
+  $('sq').addEventListener('keydown', e => { if (e.key === 'Escape') { $('sq').value = ''; loadHist(); } });
+  const pre = new URLSearchParams(location.search).get('q'); if (pre) { $('sq').value = pre; setTimeout(runSearch, 50); }
+}
+async function runSearch() {
+  const text = $('sq').value.trim();
+  if (!text) { loadHist(); return; }
+  const r = await api('/api/search?q=' + encodeURIComponent(text));
+  if ($('sq').value.trim() !== text) return;
+  const hl = h => esc(h).replace(/&lt;mark&gt;/g, '<mark>').replace(/&lt;\/mark&gt;/g, '</mark>');
+  $('hist').innerHTML = `<div class="eng">${I.search} ${r.results.length} résultat(s) · ${esc(r.engine)}</div>` +
+    (r.results.length ? r.results.map(x => `<div class="sr" onclick="openConv(${jsarg(x.conversation_id)})"><b>${x.pinned ? '📌 ' : ''}${esc(x.title)}</b><span>${hl(x.snippet || '')}</span></div>`).join('')
+      : '<div class="grp" style="font-weight:400">Aucune conversation ne correspond.</div>');
+}
+async function del(id) { if (!confirm('Supprimer cette conversation ?')) return; await fetch(`/api/conversations/${id}`, {method:'DELETE'}); if (id === conv) home(); else loadHist(); }
+
+function composer(big) {
+  return `<div class="composer"><div class="chips" id="chips"></div>
+    <textarea id="q" rows="${big ? 2 : 1}" placeholder="${big ? 'Que voulez-vous préparer ? Une revue hebdo, un rapport 8D, un compte rendu…' : 'Répondre ou demander une modification…'}"></textarea>
+    <div class="bar"><button class="ib" title="Joindre un document" onclick="$('fileIn').click()">${I.clip}</button>
+    <button class="go" id="go" onclick="sendMsg()">${I.send}</button></div></div>
+    <div class="foot"><b>Assistant d'intelligence artificielle</b> : réponses générées automatiquement, à vérifier · {{FOOTER}}</div>`;
+}
+function wireComposer() {
+  const q = $('q'); renderChips();
+  q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = q.scrollHeight + 'px'; });
+  q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } });
+  $('go').disabled = busy;
+}
+
+function home() {
+  history.replaceState(null, '', location.pathname);
+  conv = null; nav(null); title(''); $('dock').innerHTML = ''; loadHist();
+  const first = CFG.name.split(' ')[0], depts = Object.keys(CFG.departments);
+  if (dept && !(dept in CFG.departments)) { dept = null; try { localStorage.removeItem('dept'); } catch (e) {} }  // stale choice from another configuration
+  const sugg = (dept ? CFG.departments[dept] : depts.map(d => (CFG.departments[d] || [])[0])).filter(Boolean);
+  $('view').innerHTML = `<div class="hero"><h1>Bonjour ${esc(first)}</h1>
+    <p>Vos présentations, comptes rendus et rapports, préparés à partir des {{DATA_LABEL}} et des documents {{COMPANY}}.</p>
+    ${composer(true)}
+    <div class="seg">${['Tous', ...depts].map(d => `<button class="${(d === 'Tous' && !dept) || d === dept ? 'on' : ''}" onclick="pickDept(${jsarg(d)})">${esc(d)}</button>`).join('')}</div>
+    <div class="lbl">Modèles {{COMPANY}}</div>
+    <div class="tpls">${CFG.templates.map(t => `<div class="tpl" onclick="fill(${jsarg(t.prompt)})">${ficon(t.kind)}<div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span></div></div>`).join('')}</div>
+    <div class="lbl">Suggestions${dept ? ' · ' + esc(dept) : ''}</div>
+    <div class="sug">${sugg.map(s => `<button onclick="fill(${jsarg(s)})">${I.arrow}${esc(s)}</button>`).join('')}</div></div>`;
+  wireComposer();
+}
+function pickDept(d) { dept = d === 'Tous' ? null : d; dept ? localStorage.setItem('dept', dept) : localStorage.removeItem('dept'); boot(); }
+function fill(t) { const q = $('q'); q.value = t; q.focus(); q.dispatchEvent(new Event('input')); }
+
+async function attach(f) {
+  if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  const slot = {name: f.name, uploading: true};
+  pending.push(slot); renderChips();
+  const r = await api('/api/upload', {method:'POST', body:fd});
+  pending = pending.filter(p => p !== slot);   // remove only this upload's placeholder, success or not
+  if (r.path) pending.push(r); else alert(`« ${f.name} » n'a pas pu être joint : ${r.error || 'erreur inconnue'}`);
+  renderChips();
+}
+function renderChips() { const c = $('chips'); if (c) c.innerHTML = pending.map((a, i) => `<span class="chip">${ficon(ext(a.name))}<span>${esc(a.uploading ? 'Envoi… ' : '')}${esc(prettyName(a.name))}</span><button onclick="pending.splice(${i},1);renderChips()">${I.x}</button></span>`).join(''); }
+function useDoc(path, name) { home(); pending = [{path, name}]; renderChips(); $('q').focus(); }
+
+/* ---------- conversation rendering ---------- */
+function convShell() { $('view').innerHTML = '<div id="turns"></div>'; $('dock').innerHTML = composer(false); wireComposer(); }
+async function openConv(id) {
+  history.replaceState(null, '', '#c/' + id);
+  conv = id; nav(null); loadHist();
+  const c = await api(`/api/conversations/${id}`); title(c.title); pinSlot(c); convShell();
+  for (const t of c.turns) {
+    const el = turnEl(t.user_text, t.attachments); $('turns').appendChild(el);
+    if (t.live) follow(t.id, el, Date.parse(t.created_at)); else { paint(el, t.events || [], true); answer(el, t.answer); }
+  }
+  $('scroll').scrollTop = 1e9;
+}
+function turnEl(text, atts) {
+  const el = document.createElement('div');
+  el.innerHTML = `<div class="msg-u"><div class="b">${esc(text)}${atts && atts.length ? `<div class="att">${atts.map(a => `<span class="chip">${ficon(ext(a.name))}${esc(prettyName(a.name))}</span>`).join('')}</div>` : ''}</div></div>
+    <div class="msg-a"><div class="ava"><img src="brand/{{MARK}}" alt=""></div><div class="body"><div class="live"><span class="s"></span><span class="lt">Je m'en occupe…</span></div><div class="actw"></div><div class="doccards"></div><div class="prose ans"></div><div class="hand"></div></div></div>`;
+  return el;
+}
+function steps(evs) {
+  const out = [];
+  for (const e of evs) {
+    if (e.type === 'route') out.push({label: e.route === 'genie' ? 'Question données : réponse rapide' : 'Analyse complète', text: e.text, tool: 'route', done: true});
+    if (e.type === 'tool') out.push({label: e.label || e.tool, text: e.text, docs: e.docs || [], tool: e.tool, done: e.tool === 'doc'});
+    if (e.type === 'genie' && out.length) Object.assign(out[out.length - 1], {done: true, answer: e.text, link: e.link});
+    if (e.type === 'file' && out.length) out[out.length - 1].done = true;
+    if (e.type === 'error') out.push({label: 'Incident', text: e.text, err: true, done: true});
+  }
+  return out;
+}
+const pastLabel = l => l.replace(/^Analyse des (.*)$/, (m, x) => x.charAt(0).toUpperCase() + x.slice(1) + ' analysées').replace(/^Lecture de (\d+) documents?$/, (m, n) => n > 1 ? `${n} documents lus` : '1 document lu').replace('Création de la présentation', 'Présentation créée').replace('Rédaction du document Word', 'Document Word rédigé').replace('Création de la page interactive', 'Page interactive publiée');
+function paint(el, evs, final, elapsed) {
+  const st = steps(evs), body = el.querySelector('.body');
+  const blocked = evs.find(e => e.type === 'blocked');
+  const live = body.querySelector('.live');
+  if (final) live?.remove();
+  else if (live) { const cur = st.filter(s => !s.done).pop(); live.querySelector('.lt').textContent = (cur ? cur.label : 'Je réfléchis') + (elapsed ? ` · ${elapsed} s` : '') + '…'; }
+  if (st.length) {
+    const open = body.querySelector('.act')?.classList.contains('open');
+    const summary = final ? st.filter(s => !s.err).map(s => pastLabel(s.label)).join(' · ') : `${st.filter(s => s.done).length} étape(s) terminée(s)`;
+    body.querySelector('.actw').innerHTML = `<div class="act ${open ? 'open' : ''}"><div class="act-h" onclick="this.parentNode.classList.toggle('open')">
+      <span class="stp" style="padding:0"><span class="dot ok">${I.check}</span></span>${esc(summary)}<span class="chev">${I.chev}</span></div>
+      <div class="act-b">${st.map(s => `<div class="stp"><span class="dot ${s.err ? 'err' : s.done ? 'ok' : 'run'}">${s.done && !s.err ? I.check : ''}</span><div style="flex:1;min-width:0">
+        <b>${esc(s.label)}</b>${s.tool === 'genie' ? ' <span style="color:var(--muted);font-size:12px">· Genie One</span>' : ''}
+        ${s.docs && s.docs.length ? `<div class="docs">${s.docs.map(d => `<span class="chip">${ficon(ext(d))}${esc(prettyName(d))}</span>`).join('')}</div>` : ''}
+        ${s.tool === 'genie' || s.tool === 'doc' ? `<div class="d">${esc(s.text)}</div>` : ''}
+        ${s.answer ? `<details><summary style="font-size:12.5px;color:var(--teal);cursor:pointer;margin-top:6px">Réponse de Genie One</summary><div class="gans">${md(s.answer)}${s.link ? `<p><a href="${esc(safeUrl(s.link))}" target="_blank" rel="noopener noreferrer">Ouvrir dans Genie One (requêtes SQL et sources)</a></p>` : ''}</div></details>` : ''}
+      </div></div>`).join('')}</div></div>`;
+  }
+  const ident = evs.find(e => e.type === 'identity');
+  if (ident) body.querySelector('.actw').insertAdjacentHTML('afterbegin', `<div class="blocked">${I.shield}<div><b>Identité de l'application utilisée</b><br>${esc(ident.text)}</div></div>`);
+  const masked = evs.find(e => e.type === 'masked');
+  if (masked) body.querySelector('.actw').insertAdjacentHTML('afterbegin', `<div class="masked">${I.shield}<div><b>Données sensibles protégées</b><br>${esc(masked.text)}</div></div>`);
+  if (blocked) body.querySelector('.actw').insertAdjacentHTML('afterbegin', `<div class="blocked">${I.shield}<div><b>Requête bloquée par la politique {{COMPANY}}</b><br>${esc(blocked.text)}</div></div>`);
+  const files = evs.filter(e => e.type === 'file');
+  body.querySelector('.doccards').innerHTML = files.map(docCard).join('');
+  const tr = evs.find(e => e.type === 'trace');
+  if (tr && tr.url && body.querySelector('.act-b')) body.querySelector('.act-b').insertAdjacentHTML('beforeend', `<a class="trc" href="${esc(safeUrl(tr.url))}" target="_blank" rel="noopener noreferrer">${I.trace}Trace d'exécution (MLflow) · ${esc(tr.trace_id.split('/').pop().slice(0, 12))}…</a>`);
+  const h = evs.find(e => e.type === 'handoff' && e.own);
+  body.querySelector('.hand').innerHTML = h ? `<a class="handoff" href="${esc(safeUrl(h.link))}" target="_blank" rel="noopener noreferrer"><span class="hi">${I.genie}</span><span class="ht"><b>${final ? 'Approfondir dans Genie One' : 'Suivre l\'analyse en direct dans Genie One'}</b><small>${final ? 'Graphiques, requête SQL et questions de suivi sur vos données' : 'Genie One prépare la réponse, vous pouvez l\'ouvrir dès maintenant'}</small></span><span class="ha">${I.ext}</span></a>` : '';
+}
+function answer(el, a) { el.querySelector('.ans').innerHTML = (a ? '<div class="ailbl">Généré par IA</div>' : '') + md((a || '').replace(/\[([^\]]+)\]\(\/api\/files\/[^)]+\)/g, '$1')); }
+
+/* ---------- document previews ---------- */
+function miniChart(ch) {
+  const ser = Object.values(ch.series || {}); if (!ser.length) return '';
+  const all = ser.flat().filter(v => v != null), mn = Math.min(...all), mx = Math.max(...all), W = 92, H = 58, cols = ['#1D1F46', '#3BA344', '#2EA3F2'];
+  if (ch.type === 'bar' || ch.type === 'barh' || ch.type === 'pie') {
+    const n = ser[0].length, bw = W / (n * ser.length + n);
+    return `<svg class="sv" viewBox="0 0 ${W} ${H}">${ser.map((s, j) => s.map((v, i) => { const h = mx ? (v / mx) * (H - 6) : 0; return `<rect x="${(i * (ser.length + 1) + j) * bw + bw / 2}" y="${H - h}" width="${bw * .9}" height="${h}" fill="${cols[j]}"/>`; }).join('')).join('')}</svg>`;
+  }
+  return `<svg class="sv" viewBox="0 0 ${W} ${H}"><g stroke="#EEF1F4">${[0,1,2,3].map(i => `<line x1="0" x2="${W}" y1="${6 + i * 16}" y2="${6 + i * 16}"/>`).join('')}</g>${ser.map((s, j) => `<polyline fill="none" stroke="${cols[j]}" stroke-width="1.6" points="${s.map((v, i) => `${(i / Math.max(s.length - 1, 1)) * (W - 4) + 2},${H - 4 - ((v - mn) / ((mx - mn) || 1)) * (H - 12)}`).join(' ')}"/>`).join('')}</svg>`;
+}
+function slideThumb(s, i) {
+  if (s.cover) return `<div class="sl cover"><div class="st">${esc(s.title)}</div><div class="ss">${esc(s.sub || '')}</div></div>`;
+  let vis = '';
+  if (s.chart) vis = miniChart(s.chart);
+  else if (s.table) vis = `<svg class="sv" viewBox="0 0 92 58"><rect width="92" height="8" fill="#05072E"/>${Array.from({length: Math.min(s.table.rows, 5)}, (_, r) => `<rect y="${10 + r * 9.5}" width="92" height="8" fill="${r % 2 ? '#F3F5F8' : '#E7ECF2'}"/>`).join('')}</svg>`;
+  return `<div class="sl"><div class="st">${esc(s.title)}</div><div class="sb">${(s.bullets || []).concat(['', '']).slice(0, 4).map((b, k) => `<i style="width:${[100, 85, 92, 70][k]}%"></i>`).join('')}</div>${vis}<span class="n">${i + 1}</span></div>`;
+}
+function pageThumb() { return `<div class="pg"><div class="h"></div>${[90,100,80,95].map(w => `<i style="width:${w}%"></i>`).join('')}<i class="s"></i>${[100,85,92].map(w => `<i style="width:${w}%"></i>`).join('')}<i class="s"></i>${[95,70].map(w => `<i style="width:${w}%"></i>`).join('')}</div>`; }
+function docCard(f) {
+  const ol = f.outline || [], isP = f.kind === 'pptx';
+  if (f.kind === 'html') return `<div class="doc"><div class="doc-h">${ficon('html')}<div><div class="ti">${esc(f.title || prettyName(f.name))}</div><div class="me2">${esc('Page web interactive' + (ol.length ? ` · ${ol.length} onglets` : ''))}</div></div>
+    <a class="dl" href="${esc(f.url || '/api/files/' + encodeURIComponent(f.name))}" target="_blank">${I.ext}Ouvrir la page</a></div>
+    ${f.template ? `<div class="page"><div class="outl"><div style="color:var(--muted)">${esc(f.template)}</div>${ol.map(s => `<div>${I.check}${esc(s.heading)}</div>`).join('')}</div></div>` : ''}</div>`;
+  const meta = isP ? `PowerPoint · ${ol.length} diapositives · ${f.template || ''}` : `Word · ${ol.length} sections · ${f.template || ''}`;
+  return `<div class="doc"><div class="doc-h">${ficon(f.kind)}<div><div class="ti">${esc(f.title || prettyName(f.name))}</div><div class="me2">${esc(meta)}</div></div>
+    <a class="dl" href="${esc(f.url || '/api/files/' + encodeURIComponent(f.name))}">${I.dl}Télécharger</a></div>
+    ${isP ? `<div class="strip">${ol.map(slideThumb).join('')}</div>`
+          : `<div class="page">${pageThumb()}<div class="outl">${ol.map(s => `<div>${I.check}${esc(s.heading)}</div>`).join('')}</div></div>`}</div>`;
+}
+
+/* ---------- live follow ---------- */
+async function follow(tid, el, t0 = Date.now()) {
+  let since = 0, evs = [], fails = 0; busy = true; if ($('go')) $('go').disabled = true;
+  while (true) {
+    await new Promise(r => setTimeout(r, 1200));
+    const p = await api(`/api/turns/${tid}?since=${since}`);
+    if (p.error && !/introuvable|terminé/.test(p.error) && (fails = (fails || 0) + 1) < 8) { continue; }  // transient network or proxy error: keep polling
+    if (p.error || Date.now() - t0 > 25 * 60 * 1000) {  // turn lost (service restarted) or far too long: say so instead of spinning
+      paint(el, evs, true); answer(el, "La demande a été interrompue (redémarrage du service ou délai dépassé). Relancez-la."); break;
+    }
+    fails = 0; since = p.next; evs = evs.concat(p.events.filter(e => e.type !== 'progress'));
+    paint(el, evs, p.status === 'done', Math.round((Date.now() - t0) / 1000));
+    if (p.status === 'done') { answer(el, p.answer); break; }
+    $('scroll').scrollTop = 1e9;
+  }
+  busy = false; if ($('go')) $('go').disabled = false; loadHist();
+}
+async function sendMsg() {
+  const q = $('q'), text = q.value.trim(); if (!text || busy || pending.some(p => p.uploading)) return;
+  busy = true; if ($('go')) $('go').disabled = true;  // set before any await: a double Enter must not send twice
+  if (!conv) { conv = (await api('/api/conversations', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({department:dept})})).id; title(text.slice(0, 80)); convShell(); }
+  const atts = pending; pending = []; $('q').value = ''; renderChips();
+  const el = turnEl(text, atts); $('turns').appendChild(el); $('scroll').scrollTop = 1e9;
+  const r = await api(`/api/conversations/${conv}/messages`, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({text, attachments:atts})});
+  if (!r.turn_id) { el.querySelector('.live')?.remove(); answer(el, r.error || "La demande n'a pas pu être envoyée."); busy = false; if ($('go')) $('go').disabled = false; return; }
+  loadHist(); follow(r.turn_id, el);
+}
+
+/* ---------- documents & library ---------- */
+async function filesView() {
+  history.replaceState(null, '', '#documents');
+  conv = null; nav('n-files'); title('Mes documents'); $('dock').innerHTML = ''; loadHist();
+  const fs = await api('/api/files');
+  $('view').innerHTML = `<div class="ph"><div><h1>Mes documents</h1><p>Documents préparés pour vous, conservés dans l'espace {{COMPANY}}.</p></div></div>
+   ${fs.length ? `<div class="grid">${fs.map(f => { const m = f.meta || {}, ol = m.outline || [];
+     return `<a class="fc" href="/api/files/${encodeURIComponent(f.name)}" ${f.kind === 'html' ? 'target="_blank"' : ''}><div class="th">${f.kind === 'pptx' && ol.length ? slideThumb(ol[1] || ol[0], 1) : pageThumb()}</div>
+     <div class="inf"><b>${esc(f.title || prettyName(f.name))}</b><span>${f.kind === 'pptx' ? 'PowerPoint' : f.kind === 'html' ? 'Page web' : 'Word'} · ${fmt(f.created_at)}</span></div></a>`; }).join('')}</div>`
+   : `<div class="empty">Aucun document pour l'instant.<br><br><button class="btn p" onclick="home()">Préparer un document</button></div>`}`;
+}
+let libFolder = 'Tous';
+async function libraryView() {
+  history.replaceState(null, '', '#bibliotheque');
+  conv = null; nav('n-lib'); title('Bibliothèque {{COMPANY}}'); $('dock').innerHTML = ''; loadHist();
+  const docs = await api('/api/library'), folders = ['Tous', ...new Set(docs.map(d => d.folder || 'Général'))];
+  const shown = docs.filter(d => libFolder === 'Tous' || (d.folder || 'Général') === libFolder);
+  const label = f => ({Qualite:'Qualité', Modeles:'Modèles'}[f] || f);
+  $('view').innerHTML = `<div class="ph"><div><h1>Bibliothèque {{COMPANY}}</h1><p>Procédures, standards, comptes rendus et modèles que l'assistant peut lire.</p></div>
+     <label class="btn">＋ Ajouter un document<input type="file" hidden onchange="libUp(this.files[0])"></label></div>
+   <div class="fchips">${folders.map(f => `<button class="${f === libFolder ? 'on' : ''}" onclick="libFolder=${jsarg(f)};libraryView()">${esc(label(f))}</button>`).join('')}</div>
+   <div class="lib">${shown.map(d => `<div class="lr">${ficon(ext(d.name))}<div class="nm">${esc(prettyName(d.name))}<small>${label(d.folder || 'Général')} · ${d.modified ? new Date(d.modified).toLocaleDateString('fr-FR') : ''}</small></div>
+     <div class="acts"><a class="btn" href="/api/library/download?path=${encodeURIComponent(d.path)}">Ouvrir</a><button class="btn p" onclick="useDoc(${jsarg(d.path)}, ${jsarg(d.name)})">Utiliser</button></div></div>`).join('')}</div>`;
+}
+async function libUp(f) { if (!f) return; const fd = new FormData(); fd.append('file', f); fd.append('folder', libFolder === 'Tous' ? 'Qualite' : libFolder); await fetch('/api/library/upload', {method:'POST', body:fd}); libraryView(); }
+boot();
+</script>
+</body>
+</html>

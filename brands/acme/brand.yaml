@@ -1,0 +1,51 @@
+# Example second brand, used to prove the accelerator is brand-agnostic.
+name: Atlas
+company: Acme Industries
+site: Siège
+org_label: Direction du numérique
+language: fr
+description: "l'assistant interne d'Acme Industries (équipementier industriel)"
+
+colors:
+  primary: "#0E2A47"
+  primary_2: "#1F3F63"
+  accent: "#E07A1F"
+  secondary: "#2B7BB9"
+fonts:
+  heading: "IBM Plex Sans"
+  body: "IBM Plex Sans"
+  office: "Calibri"
+
+logos:
+  wordmark: wordmark.png
+  wordmark_on_dark: wordmark_on_dark.png
+  mark: mark.png
+  favicon: mark.png
+
+departments: [Qualité, Achats, Production, Finance]
+
+templates:
+  - id: synthese
+    kind: docx
+    name: Note de synthèse
+    desc: Une page pour le comité de direction
+    prompt: "Rédige une note de synthèse d'une page sur la situation qualité du mois."
+  - id: revue
+    kind: pptx
+    name: Revue mensuelle
+    desc: Présentation aux couleurs Acme
+    prompt: "Prépare une revue mensuelle en 4 diapositives : faits marquants, indicateurs, risques, actions."
+  - id: carte
+    kind: html
+    name: Tableau de bord interactif
+    desc: Page web au design Acme
+    prompt: "Construis un tableau de bord interactif des non-conformités par origine et par statut."
+
+footer: "Vos droits d'accès s'appliquent · données et documents restent chez Acme"
+site_short: Siège
+instructions: ""
+suggestions:
+  Qualité: ["Quelles sont les non-conformités ouvertes depuis plus de 60 jours ?", "Rédige un rapport 8D à partir du compte rendu joint"]
+  Achats: ["Quels fournisseurs ont le plus de non-conformités ce trimestre ?", "Prépare une note de synthèse sur le risque fournisseur"]
+  Production: ["Prépare la revue mensuelle de production en PowerPoint", "Résume le compte rendu de la dernière réunion de production"]
+  Finance: ["Rédige une note de synthèse sur les coûts de non-qualité", "Prépare 3 diapositives sur les écarts budgétaires du mois"]

@@ -1,0 +1,54 @@
+# Second example brand (fictional), used to prove the accelerator is brand-agnostic.
+name: Orion
+company: Orion Logistique
+site: Siège
+site_short: Siège
+org_label: Direction des systèmes d'information
+language: fr
+description: "l'assistant interne d'Orion Logistique (transport et entreposage)"
+
+colors:
+  primary: "#123B3A"
+  primary_2: "#1E5552"
+  accent: "#14B8A6"
+  secondary: "#3B82F6"
+fonts:
+  heading: "Inter"
+  body: "Inter"
+  office: "Calibri"
+
+logos:
+  wordmark: wordmark.png
+  wordmark_on_dark: wordmark_on_dark.png
+  mark: mark.png
+  favicon: mark.png
+
+departments: [Exploitation, Qualité, Commercial, Finance]
+data_label: "données d'exploitation"
+data_examples: "volumes expédiés, délais de livraison, taux de service, litiges, tendances, comparaisons entre entrepôts"
+
+templates:
+  - id: revue
+    kind: pptx
+    name: Revue d'exploitation
+    desc: Présentation mensuelle aux couleurs Orion
+    prompt: "Prépare la revue d'exploitation du mois en 4 diapositives : volumes, taux de service, incidents, actions."
+  - id: note
+    kind: docx
+    name: Note de synthèse
+    desc: Une page pour le comité de direction
+    prompt: "Rédige une note de synthèse d'une page sur les litiges clients du mois."
+  - id: tableau
+    kind: html
+    name: Tableau de bord interactif
+    desc: Page web au design Orion
+    prompt: "Construis un tableau de bord interactif des délais de livraison par entrepôt."
+
+instructions: ""
+suggestions:
+  Exploitation: ["Quel est le taux de service par entrepôt ce mois-ci ?", "Prépare la revue d'exploitation en PowerPoint"]
+  Qualité: ["Quels sont les litiges ouverts depuis plus de 30 jours ?", "Rédige un rapport 8D à partir du compte rendu joint"]
+  Commercial: ["Résume le compte rendu de la réunion client joint", "Prépare une note sur les clients à risque"]
+  Finance: ["Rédige une note sur les coûts de non-qualité", "Prépare 3 diapositives sur les écarts budgétaires"]
+
+footer: "Vos droits d'accès s'appliquent · données et documents restent chez Orion Logistique"

@@ -1,0 +1,6 @@
+# Installer and test tooling (the app's runtime deps are in app/requirements.txt)
+-r app/requirements.txt
+pyyaml==6.0.3
+pillow==12.0.0
+pytest==9.0.1
+httpx==0.28.1

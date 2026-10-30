@@ -1,0 +1,54 @@
+# Governed Assistant Accelerator: deployment settings (one file per environment).
+# Everything the installer creates and everything the app reads comes from here and from the brand pack.
+
+workspace:
+  profile: DEFAULT                 # Databricks CLI profile used by the installer (databricks auth login)
+  warehouse_id: <warehouse-id>     # SQL warehouse for setup SQL, trace queries and the dashboard
+
+brand: acme                       # folder under brands/
+
+unity_catalog:
+  catalog: main                    # must exist; the installer creates the schema inside it
+  schema: acme_assistant
+  volume: fichiers                # library/, generated/, uploads/ are created inside
+
+app:
+  name: acme-assistant            # Databricks App name (lowercase, dashes)
+  obo: true                       # run model, Genie One and SQL calls with the signed-in user's identity
+
+models:
+  # Governed model services created in Unity AI Gateway. The office assistant uses `assistant`.
+  assistant:
+    service: assistant_bureautique
+    model: system.ai.databricks-claude-sonnet-5-5
+  developer:                      # optional: coding agents (Codex CLI, Claude Code) through the same gateway
+    service: assistant_dev
+    model: system.ai.databricks-gpt-5-6-terra
+  max_output_tokens: 64000
+  effort: medium
+
+governance:
+  rate_limit_per_user_per_minute: 60
+  ip_leak_policy:                 # custom UC function policy: DENY when any keyword appears in a request
+    name: anti-fuite-pi
+    keywords: ["confidentiel r&d", "iso-10303-21", "file_schema"]
+    reason: "Document de propriété intellectuelle (plan CAO, R&D confidentiel) : envoi interdit hors du périmètre autorisé."
+  builtin_policies:               # Databricks built-in guardrails
+    jailbreak: true
+    unsafe_content: true
+    sensitive_data:               # anonymisation (redact) before the model sees the request
+      action: transform
+      categories: [class.email_address, class.phone_number, class.iban_code, class.credit_card]
+
+data:
+  genie_one: true                 # data questions go to Genie One (system.ai.genie_one_mcp) with the user's rights
+  scope: "Décrivez ici les tables métier que Genie One peut interroger (ex. catalog.schema.table : contenu)."
+
+observability:
+  mlflow_experiment: /Shared/acme-assistant-traces   # linked to UC trace tables in <catalog>.<schema>, prefix `assistant`
+  usage_job_cron: "0 5 * * * ?"   # hourly gold layer refresh (ai_classify of usages)
+
+pricing:                          # USD per million tokens (input, output); Anthropic list prices 2026-10, validate against your contract
+  claude-sonnet-5-5: [2.0, 10.0]
+  claude-opus-5-5: [4.0, 20.0]
+  default: [2.0, 10.0]
