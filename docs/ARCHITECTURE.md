@@ -1,5 +1,9 @@
 # Architecture
 
+![Architecture](architecture.png)
+
+Source : `docs/architecture/architecture.html` ; rendu : `uv run --with playwright python docs/architecture/render.py`.
+
 ## Composants
 
 | Composant | Rôle | Où |

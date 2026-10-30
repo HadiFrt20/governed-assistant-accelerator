@@ -35,29 +35,9 @@ Seules des fonctions Databricks disponibles pour tous (GA) sont activées par d�
 
 ## Architecture
 
-```
-Utilisateurs (SSO) ──► Databricks App (FastAPI + UI de marque, identité de l'utilisateur)
-                         │
-                         ├─ Routeur : question de données → Genie One (réponse courte + lien)
-                         │            sinon → agent (Claude) + outils
-                         │
-                         ├─ Unity AI Gateway ── politiques : anti-fuite (fonction UC), jailbreak,
-                         │   (model services)    contenu, anonymisation ; limites ; tables d'inférence
-                         │      ├─ Claude (assistant)        ├─ Genie One MCP ──► tables UC (droits de l'utilisateur)
-                         │      └─ modèle de code (agents de développement, optionnel)
-                         │
-                         ├─ Bibliothèques = volumes UC, lus avec le jeton de l'utilisateur (Files API)
-                         │      ├─ ai_parse_document (texte, tableaux, figures, pages) ── cache Lakebase
-                         │      └─ index plein texte Lakebase ──► search_library (passages + page, filtrés par droits)
-                         ├─ Générateurs : PowerPoint / Word (modèles de marque), pages HTML (design system + contrôle avant publication)
-                         │      └─► volume UC des fichiers personnels (générés, téléversés), confinés par utilisateur
-                         ├─ Lakebase (Postgres) : conversations, épingles, recherche
-                         └─ MLflow Tracing ──► tables UC <catalog>.<schema>_traces.assistant_otel_*
+![Architecture : équipes, Databricks App, Unity AI Gateway, modèles et données, Unity Catalog, Lakebase, pilotage, déploiement](docs/architecture.png)
 
-system.ai_gateway.usage + historique ──► job horaire (ai_classify) ──► tableau de bord AI/BI
-```
-
-Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Source modifiable : [docs/architecture/architecture.html](docs/architecture/architecture.html). Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Prérequis
 

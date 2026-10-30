@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Assistant interne gouverné · architecture</title>
+<!-- Source of docs/architecture.png. Edit here, then: uv run --with playwright python docs/architecture/render.py -->
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --oat:#F9F7F4; --oat2:#EEEDE9; --line:#DCD8D1; --slate:#1B3139; --slate2:#2C4A54; --muted:#5F7177; --lava:#FF3621; --lava-soft:#FFEDE9; --green:#00A972; --white:#FFFFFF; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#E9E6E0; font-family:"DM Sans", system-ui, sans-serif; color:var(--slate); }
+  #canvas { position:relative; width:1600px; height:1076px; background:var(--oat); overflow:hidden; }
+  .abs { position:absolute; }
+  h1 { font-size:34px; font-weight:700; letter-spacing:-0.02em; }
+  .sub { font-size:17px; color:var(--muted); margin-top:8px; max-width:1180px; line-height:1.4; }
+  .tag { font-family:"DM Mono", monospace; font-size:11.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); }
+  .card { background:var(--white); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
+  .card h2 { font-size:19px; font-weight:700; margin:4px 0 2px; }
+  .card .what { font-size:13.5px; color:var(--muted); line-height:1.4; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .chip { font-size:12.5px; font-weight:500; padding:5px 10px; border-radius:999px; background:var(--oat2); color:var(--slate); white-space:nowrap; }
+  .chip.lava { background:var(--lava-soft); color:#B4200E; }
+  .chip.dark { background:var(--slate); color:#fff; }
+  .item { border-top:1px solid var(--oat2); padding:10px 0 2px; }
+  .item:first-of-type { border-top:none; }
+  .item b { font-size:14.5px; font-weight:600; display:block; }
+  .item span { font-size:12.8px; color:var(--muted); line-height:1.38; display:block; margin-top:2px; }
+  .gw { border:2px solid var(--lava); }
+  .gw .tag { color:var(--lava); }
+  .band { background:var(--white); border:1px solid var(--line); border-radius:14px; padding:14px 20px; }
+  .band .cells { display:grid; gap:12px; margin-top:10px; }
+  .cell { background:var(--oat); border-radius:10px; padding:10px 12px; }
+  .cell b { font-size:14px; font-weight:600; display:block; }
+  .cell span { font-size:12.4px; color:var(--muted); line-height:1.35; display:block; margin-top:3px; }
+  .deploy { background:var(--slate); color:#fff; border-radius:14px; padding:14px 18px; display:flex; align-items:center; gap:12px; }
+  .deploy .tag { color:#9FB3B8; }
+  .step { flex:1; align-self:stretch; display:flex; flex-direction:column; justify-content:center; background:var(--slate2); border-radius:10px; padding:9px 13px; font-size:13.2px; line-height:1.3; }
+  .step b { display:block; font-size:14px; }
+  .arrowtxt { font-family:"DM Mono", monospace; font-size:11px; letter-spacing:0.04em; fill:var(--slate); }
+  .legend { font-size:12.5px; color:var(--muted); display:flex; gap:22px; align-items:center; }
+  .legend i { display:inline-block; width:34px; height:0; border-top:3px solid var(--lava); vertical-align:middle; margin-right:8px; }
+  .legend i.app { border-top:3px dashed var(--slate2); }
+  .user-ic { width:44px; height:44px; border-radius:50%; background:var(--slate); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; }
+</style>
+</head>
+<body>
+<div id="canvas">
+
+  <!-- header -->
+  <div class="abs" style="left:48px; top:40px;">
+    <div class="tag">Governed Assistant Accelerator · architecture</div>
+    <h1 style="margin-top:8px">Un assistant interne qui tourne entièrement dans Databricks</h1>
+    <div class="sub">Chaque demande est traitée avec les droits de la personne qui la pose. Chaque appel à un modèle passe par Unity AI Gateway. Chaque document et chaque donnée restent dans Unity Catalog.</div>
+  </div>
+  <div class="abs legend" style="right:48px; top:52px;"><span><i></i>identité de l'utilisateur</span><span><i class="app"></i>identité de l'application</span></div>
+
+  <!-- column 1: people -->
+  <div class="abs card" style="left:48px; top:170px; width:236px; height:440px;">
+    <div class="tag">Équipes métier</div>
+    <div style="display:flex; gap:10px; align-items:center; margin:12px 0 4px">
+      <div class="user-ic">A</div><div><b style="font-size:15px">Connexion SSO</b><div class="what">navigateur, sans installation</div></div>
+    </div>
+    <div class="item"><b>Chat en français</b><span>historique, épingles, recherche dans ses conversations</span></div>
+    <div class="item"><b>Questions sur les données</b><span>réponse chiffrée et lien pour approfondir dans Genie One</span></div>
+    <div class="item"><b>Bibliothèque</b><span>procédures et documents internes, lus et cités avec la page</span></div>
+    <div class="item"><b>Livrables</b><span>PowerPoint, Word, pages web, aux couleurs de l'entreprise</span></div>
+  </div>
+
+  <!-- column 2: app -->
+  <div class="abs card" style="left:344px; top:170px; width:420px; height:440px;">
+    <div class="tag">Databricks App</div>
+    <h2>Assistant à la marque du client</h2>
+    <div class="what">Interface, agent et outils. Aucune donnée ni aucun droit propres : il agit pour l'utilisateur.</div>
+    <div class="item" style="margin-top:8px"><b>Routeur</b><span>question de données → Genie One (réponse rapide) · sinon → agent</span></div>
+    <div class="item"><b>Agent et outils</b>
+      <div class="row" style="margin-top:6px"><span class="chip">search_library</span><span class="chip">read_document</span><span class="chip">genie_one</span><span class="chip">create_pptx</span><span class="chip">create_docx</span><span class="chip">create_html</span></div></div>
+    <div class="item"><b>Contrôle du design system avant publication</b><span>composants réels, onglets remplis, aucun script réseau ; une page non conforme est corrigée</span></div>
+    <div class="item"><b>Générateurs</b><span>modèles PowerPoint et Word, pages web : design system importé (Figma, CSS, tokens), marquage IA</span></div>
+  </div>
+
+  <!-- column 3: gateway -->
+  <div class="abs card gw" style="left:824px; top:170px; width:360px; height:440px;">
+    <div class="tag">Unity AI Gateway · contrôle unique</div>
+    <h2>Model services gouvernés</h2>
+    <div class="what">Tous les appels modèle, sans exception, avec l'identité de l'utilisateur.</div>
+    <div class="item" style="margin-top:8px"><b>Politiques avant et après le modèle</b>
+      <div class="row" style="margin-top:6px"><span class="chip lava">anti-fuite (fonction UC)</span><span class="chip lava">anti-jailbreak</span><span class="chip lava">contenu inapproprié</span><span class="chip lava">anonymisation</span></div></div>
+    <div class="item"><b>Limites de débit par utilisateur</b><span>appliquées par la plateforme</span></div>
+    <div class="item"><b>Journal des requêtes</b><span>tables d'inférence et system.ai_gateway.usage</span></div>
+    <div class="item"><b>Genie One (MCP)</b><span>assistant de données gouverné, droits de l'utilisateur</span></div>
+  </div>
+
+  <!-- column 4: models -->
+  <div class="abs card" style="left:1244px; top:170px; width:308px; height:208px;">
+    <div class="tag">Modèles</div>
+    <div class="item" style="margin-top:6px"><b>Claude · assistant</b><span>raisonnement, rédaction, outils</span></div>
+    <div class="item"><b>Modèle de code · optionnel</b><span>agents de développement, mêmes politiques</span></div>
+  </div>
+  <div class="abs card" style="left:1244px; top:402px; width:308px; height:208px;">
+    <div class="tag">Données métier</div>
+    <div class="item" style="margin-top:6px"><b>Tables Unity Catalog</b><span>interrogées par Genie One en SQL, avec les droits de l'utilisateur</span></div>
+    <div class="item"><b>Masques et filtres respectés</b><span>une colonne masquée reste masquée (vérifié en recette)</span></div>
+  </div>
+
+  <!-- unity catalog band -->
+  <div class="abs band" style="left:344px; top:664px; width:1208px; height:142px;">
+    <div class="tag">Unity Catalog · tout est gouverné ici</div>
+    <div class="cells" style="grid-template-columns:1.25fr 1fr 1fr 1fr 1fr;">
+      <div class="cell"><b>Bibliothèques</b><span>un volume par bibliothèque ; lecture et ajout avec les droits de chacun (groupes)</span></div>
+      <div class="cell"><b>ai_parse_document</b><span>texte, tableaux, figures, pages ; lecteurs intégrés en secours</span></div>
+      <div class="cell"><b>Fichiers personnels</b><span>pièces jointes et livrables, confinés par utilisateur</span></div>
+      <div class="cell"><b>Traces MLflow</b><span>une trace par demande, coût compris, dans des tables UC</span></div>
+      <div class="cell"><b>Couche gold d'usage</b><span>usages classés par ai_classify, blocages, coûts</span></div>
+    </div>
+  </div>
+
+  <!-- lakebase -->
+  <div class="abs band" style="left:48px; top:664px; width:236px; height:142px;">
+    <div class="tag">Lakebase (Postgres)</div>
+    <div class="cell" style="margin-top:10px"><b>État de l'application</b><span>conversations, cache des documents lus, index de recherche de la bibliothèque</span></div>
+  </div>
+
+  <!-- observability -->
+  <div class="abs band" style="left:48px; top:828px; width:1504px; height:80px; display:flex; align-items:center; gap:18px;">
+    <div class="tag" style="width:150px">Pilotage</div>
+    <div class="row" style="margin:0"><span class="chip dark">Tableau de bord AI/BI : adoption, usages, coûts, blocages, latence</span><span class="chip">job d'usage horaire</span><span class="chip">traces consultables dans MLflow</span><span class="chip">configuration des garde-fous publiée</span></div>
+  </div>
+
+  <!-- deployment -->
+  <div class="abs deploy" style="left:48px; top:930px; width:1504px; height:110px;">
+    <div style="width:180px; flex:none"><div class="tag">Déploiement</div><div style="font-weight:700; font-size:18px; margin-top:4px">./assistant deploy</div></div>
+    <div class="step"><b>Questions guidées</b>marque, connexion, emplacement</div>
+    <div class="step"><b>Asset Bundle</b>toutes les ressources décrites</div>
+    <div class="step"><b>Contrôles préalables</b>chaque prérequis, avec la correction</div>
+    <div class="step"><b>Tests sur le build exact</b>bloquants</div>
+    <div class="step"><b>Garde-fous appliqués et relus</b>échec fermé sinon</div>
+    <div class="step"><b>Vérification réelle</b>blocages, anonymisation, traces</div>
+  </div>
+
+  <!-- arrows -->
+  <svg class="abs" style="left:0; top:0" width="1600" height="1100" viewBox="0 0 1600 1100">
+    <defs>
+      <marker id="lava" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 z" fill="#FF3621"/></marker>
+      <marker id="slate" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 z" fill="#2C4A54"/></marker>
+    </defs>
+    <!-- people → app -->
+    <line x1="286" y1="390" x2="340" y2="390" stroke="#FF3621" stroke-width="3" marker-end="url(#lava)"/>
+    <!-- app → gateway -->
+    <line x1="766" y1="300" x2="820" y2="300" stroke="#FF3621" stroke-width="3" marker-end="url(#lava)"/>
+    <line x1="766" y1="520" x2="820" y2="520" stroke="#FF3621" stroke-width="3" marker-end="url(#lava)"/>
+    <!-- gateway → models / data -->
+    <line x1="1186" y1="274" x2="1240" y2="274" stroke="#FF3621" stroke-width="3" marker-end="url(#lava)"/>
+    <line x1="1186" y1="540" x2="1240" y2="540" stroke="#FF3621" stroke-width="3" marker-end="url(#lava)"/>
+    <!-- app → libraries (user token), personal files (app) -->
+    <line x1="470" y1="612" x2="470" y2="660" stroke="#FF3621" stroke-width="3" marker-end="url(#lava)"/>
+    <text class="arrowtxt" x="482" y="642">jeton utilisateur</text>
+    <path d="M 740 612 L 740 636 L 930 636 L 930 660" fill="none" stroke="#2C4A54" stroke-width="3" stroke-dasharray="7 6" marker-end="url(#slate)"/>
+    <text class="arrowtxt" x="760" y="628">confinés par utilisateur</text>
+    <!-- data → UC -->
+    <line x1="1398" y1="612" x2="1398" y2="660" stroke="#FF3621" stroke-width="3" marker-end="url(#lava)"/>
+    <!-- app → lakebase -->
+    <path d="M 400 612 L 400 636 L 166 636 L 166 660" fill="none" stroke="#2C4A54" stroke-width="3" stroke-dasharray="7 6" marker-end="url(#slate)"/>
+  </svg>
+</div>
+</body>
+</html>
