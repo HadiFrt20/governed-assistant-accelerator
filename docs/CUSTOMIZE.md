@@ -55,3 +55,36 @@ Relancez l'installateur, puis :
 - ouvrez l'app en fenêtre privée, posez une question de données et une demande de document ;
 - envoyez une demande contenant un e-mail et un IBAN fictifs : un bandeau vert « Données sensibles protégées » apparaît et la trace montre `ANONYMISATION` ;
 - envoyez une demande contenant un mot-clé de la politique anti-fuite : la demande est bloquée avec la raison configurée.
+
+
+## Importer votre design system
+
+L'assistant applique les couleurs et polices de la marque partout : l'interface, les pages web générées, PowerPoint et Word. Elles viennent de `brand.yaml`, ou de votre design system s'il est importé :
+
+```bash
+./assistant design import --brand <marque> tokens.json        # design tokens W3C (Tokens Studio, Style Dictionary, export Figma)
+./assistant design import --brand <marque> variables.json     # export des variables Figma (API REST)
+./assistant design import --brand <marque> styles.css         # fichier CSS avec variables --couleur
+./assistant design import --brand <marque> tokens.json --map primary=color.brand.900   # choisir un token précis
+./assistant design check --brand <marque>                     # lisibilité des couleurs (WCAG AA)
+```
+
+L'import reconnaît les rôles par leur nom (primary, accent, secondary, police des titres et du texte), affiche ce qu'il a retenu et refuse une couleur principale illisible sous du texte blanc. Il écrit `brands/<marque>/design/tokens.json`, appliqué au prochain déploiement. Les composants (synthèse, indicateurs, tableaux, cartes, cartographie) restent ceux de la bibliothèque `app/design/ds.js` : un nouveau design system ne demande aucun code.
+
+Avant publication, chaque page web générée est contrôlée (`app/design_lint.py`) : composants existants, emplacements remplis, onglets non vides, pas de script réseau ni de HTML écrit à la main, données présentes. Une page non conforme est renvoyée une fois au modèle avec la liste précise des problèmes ; le score est enregistré dans la trace.
+
+## Bibliothèques par service
+
+Chaque bibliothèque est un volume Unity Catalog. L'assistant la lit avec les droits de l'utilisateur : chacun ne voit, ne cherche et ne cite que ce à quoi il a droit.
+
+```yaml
+libraries:
+  - name: bibliotheque            # commune
+    label: Bibliothèque
+  - name: qualite
+    label: Qualité
+    readers: equipe-qualite       # groupe qui peut la lire (par défaut : access.users_group)
+    curators: responsables-qualite # groupe qui peut y ajouter des documents (par défaut : la personne qui installe)
+```
+
+Les documents sont lus par `ai_parse_document` (texte, tableaux, figures, numéros de page ; Word, PowerPoint, PDF, images), avec les lecteurs intégrés en secours (`documents.parser: builtin` pour ne garder qu'eux). Ils sont indexés quelques secondes après leur ajout.

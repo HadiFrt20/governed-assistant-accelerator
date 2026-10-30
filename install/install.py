@@ -32,14 +32,15 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import design  # noqa: E402
 import settings as settings_mod  # noqa: E402
-from settings import SENSITIVE_CATEGORIES, traces_schema  # noqa: E402
+from settings import SENSITIVE_CATEGORIES, libraries, traces_schema  # noqa: E402
 
 PHASES = ["checks", "build", "deploy", "govern", "start", "verify"]
 EXIT_CODES = {"config": 2, "checks": 2, "build": 3, "deploy": 4, "govern": 5, "start": 6, "verify": 7, "destroy": 8}
 MIN_CLI = (1, 20, 0)                       # first CLI with model_services, postgres_* and experiment trace_location in bundles
 JUDGE_MODEL = "system.ai.gpt-5-4-mini"     # model used by the built-in jailbreak / unsafe-content guardrails
-APP_SCOPES = ["ai-gateway", "sql", "dashboards.genie", "files.files", "serving.serving-endpoints"]
+APP_SCOPES = ["ai-gateway", "sql", "dashboards.genie", "files", "serving.serving-endpoints"]
 MARKER = "[governed-assistant-accelerator]"
 STATEFUL = ("postgres_projects", "postgres_catalogs", "schemas", "volumes", "experiments")  # data lives here: never recreated silently
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
@@ -82,6 +83,25 @@ def retry(fn, what, log, attempts=4, base=3):
 
 
 # ---------------------------------------------------------------- configuration
+def merge(base, over):
+    """Deep merge: dicts are merged, everything else (lists included) is replaced by the user's value."""
+    out = dict(base)
+    for k, v in (over or {}).items():
+        out[k] = merge(base[k], v) if isinstance(v, dict) and isinstance(base.get(k), dict) else v
+    return out
+
+
+def load_config(path):
+    """The user's config on top of install/defaults.yaml; the schema defaults to the app name."""
+    user = yaml.safe_load(open(path, encoding="utf-8")) or {}
+    cfg = merge(yaml.safe_load(open(Path(__file__).parent / "defaults.yaml", encoding="utf-8")), user)
+    app = str((cfg.get("app") or {}).get("name", ""))
+    cfg.setdefault("unity_catalog", {}).setdefault("schema", re.sub(r"[^a-z0-9]+", "_", app.lower()).strip("_"))
+    exp = cfg["observability"]["mlflow_experiment"]
+    cfg["observability"]["mlflow_experiment"] = exp.replace("{app}", app)
+    return cfg
+
+
 def validate_config(cfg, brand_dir):
     """Every problem in the config at once, as (key, problem, fix). Empty list = valid."""
     p = []
@@ -121,6 +141,13 @@ def validate_config(cfg, brand_dir):
          "must be transform (anonymise) or block", "ask is only supported on MCP services")
     rl = g.get("rate_limit_per_user_per_minute", 60)
     need("governance.rate_limit_per_user_per_minute", isinstance(rl, int) and rl > 0, "must be a positive integer", "e.g. 60")
+    names = [l.get("name", "") for l in (cfg.get("libraries") or [])]
+    for n in names:
+        need(f"libraries.{n}", NAME_RE.fullmatch(str(n)) and n != uc.get("volume"), "volume name: lowercase letters, digits, _, different from unity_catalog.volume",
+             "e.g. bibliotheque, qualite, rh")
+    need("libraries", len(names) == len(set(names)), "duplicate library names", "give each library its own name")
+    need("documents.parser", (cfg.get("documents") or {}).get("parser", "auto") in ("auto", "builtin"), "must be auto or builtin",
+         "auto = ai_parse_document with built-in fallback")
     exp = (cfg.get("observability") or {}).get("mlflow_experiment", "")
     need("observability.mlflow_experiment", str(exp).startswith(("/Users/", "/Shared/", "/Workspace/")), "must be an absolute workspace path",
          "e.g. /Users/<you>/<app>-traces")
@@ -229,7 +256,7 @@ class Ctx:
     def __init__(self, config_path, args):
         self.args = args
         try:
-            self.cfg = yaml.safe_load(open(config_path, encoding="utf-8"))
+            self.cfg = load_config(config_path)
         except (OSError, yaml.YAMLError) as e:
             raise DeployError("config", e, f"fix {config_path}", "config")
         self.brand_dir = ROOT / "brands" / str(self.cfg.get("brand"))
@@ -237,7 +264,8 @@ class Ctx:
         if problems:
             raise DeployError("config", "\n".join(f"  {k}: {p}" for k, p, _ in problems),
                               "\n".join(f"  {k}: {f}" for k, _, f in problems), "config")
-        self.brand = yaml.safe_load(open(self.brand_dir / "brand.yaml", encoding="utf-8"))
+        # brand.yaml, with the colours and fonts of an imported design system (brands/<b>/design/tokens.json) on top
+        self.brand = design.apply(yaml.safe_load(open(self.brand_dir / "brand.yaml", encoding="utf-8")), self.brand_dir)
         self.profile, self.warehouse = self.cfg["workspace"]["profile"], self.cfg["workspace"]["warehouse_id"]
         self.vars = bundle_variables(self.cfg, self.brand)
         self.catalog, self.schema, self.traces = self.vars["catalog"], self.vars["schema"], self.vars["traces_schema"]
@@ -351,12 +379,19 @@ def phase_checks(c):
     if not shutil.which("uv"):
         raise DeployError("uv", "not on PATH (runs the test gate)", "curl -LsSf https://astral.sh/uv/install.sh | sh")
     c.ok("config", f"brand {c.brand['name']} · {c.fq} · app {c.app}")
+    issues = design.check(c.brand["colors"])
+    if any(level == "error" for level, _ in issues):
+        raise DeployError("brand colours", "; ".join(m for l, m in issues if l == "error"),
+                          f"choose readable colours in brands/{c.cfg['brand']}/brand.yaml or design/tokens.json (python install/design.py check --brand {c.cfg['brand']})")
+    c.ok("brand colours", "readable (WCAG AA)" + (" · " + "; ".join(m for _, m in issues) if issues else "")
+         + (f" · design system: {c.brand['design_source']}" if c.brand.get("design_source") else ""))
 
     try:
         me = c.w.current_user.me().user_name
     except Exception as e:  # noqa: BLE001
         raise DeployError(f"authentication (profile {c.profile})", e, f"databricks auth login -p {c.profile} --host <workspace URL>")
     c.me, c.host = me, c.w.config.host.rstrip("/")
+    c.vars["experiment_path"] = c.vars["experiment_path"].replace("{me}", me)  # default experiment lives in the deployer's folder
     c.workspace_id = str(c.w.get_workspace_id())
     c.ok("authenticated", f"{me} on {c.host} (workspace {c.workspace_id})")
 
@@ -446,6 +481,25 @@ def build_app(c, out):
     return tpl
 
 
+def libraries_yaml(c):
+    """One UC volume per document library. Readers get READ VOLUME, curators WRITE VOLUME: with OBO the app reads and writes
+    libraries with the user's own identity, so these grants are the access control. The app identity only reads (indexing)."""
+    vols = {}
+    for lib in libraries(c.cfg):
+        grants = [{"principal": "${resources.apps.assistant.service_principal_client_id}",
+                   "privileges": ["READ_VOLUME"] if c.cfg["app"].get("obo", True) else ["READ_VOLUME", "WRITE_VOLUME"]},
+                  {"principal": lib["readers"] or c.vars["users_group"], "privileges": ["READ_VOLUME"]},
+                  {"principal": lib["curators"] or "${workspace.current_user.userName}", "privileges": ["READ_VOLUME", "WRITE_VOLUME"]}]
+        merged = {}
+        for g in grants:  # one entry per principal (readers and curators may be the same group)
+            merged.setdefault(g["principal"], set()).update(g["privileges"])
+        vols[f"library_{lib['id']}"] = {
+            "catalog_name": "${resources.schemas.assistant_schema.catalog_name}", "schema_name": "${resources.schemas.assistant_schema.name}",
+            "name": lib["id"], "volume_type": "MANAGED", "comment": f"Bibliothèque « {lib['label']} » : documents de référence lus par l'assistant avec les droits de chaque utilisateur",
+            "grants": [{"principal": k, "privileges": sorted(v)} for k, v in merged.items()]}
+    return "# generated by install/install.py from config `libraries`\n" + yaml.safe_dump({"resources": {"volumes": vols}}, allow_unicode=True, sort_keys=False)
+
+
 def render_bundle(c, out):
     """The deployable bundle: databricks.yml + resources + app + SQL + dashboard + variable values."""
     shutil.copy(ROOT / "bundle" / "databricks.yml", out / "databricks.yml")
@@ -463,6 +517,7 @@ def render_bundle(c, out):
         usage_labels=classification_labels(c.brand)[0], domain_labels=classification_labels(c.brand)[1],
         data_label_sql=_q(data_label(c.brand)))
     (out / "sql" / "gold_usage.sql").write_text(sql, encoding="utf-8")
+    (out / "resources" / "libraries.yml").write_text(libraries_yaml(c), encoding="utf-8")
     import dashboard
     (out / "dashboards").mkdir()
     ser = dashboard.build(c.fq, c.brand["name"], c.brand["company"], c.brand.get("site_short") or c.brand.get("site", ""), c.brand["colors"],
@@ -651,9 +706,9 @@ def fail_closed(c, why):
 
 def phase_govern(c):
     sp, users = c.deployed["app_sp"], c.vars["users_group"]
-    for sub in ("library", "generated", "uploads"):
+    for sub in ("generated", "uploads"):
         retry(lambda s=sub: c.w.files.create_directory(f"{c.files_root}/{s}"), "create volume folder", c.log)
-    c.ok("volume folders", f"{c.files_root}/{{library,generated,uploads}}")
+    c.ok("volume folders", f"{c.files_root}/{{generated,uploads}} · libraries: " + ", ".join(l["root"] for l in libraries(c.cfg)))
 
     try:
         for principal in (sp, users):

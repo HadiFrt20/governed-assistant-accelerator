@@ -4,7 +4,7 @@
 
 - L'app est une Databricks App : accès par le SSO de l'espace de travail.
 - Avec l'OBO activé, les appels gateway, Genie One et SQL portent l'identité de l'utilisateur. Genie One n'interroge que les tables auxquelles l'utilisateur a accès dans Unity Catalog. La gateway attribue chaque appel à l'utilisateur.
-- Scopes demandés par l'app : `ai-gateway`, `sql`, `dashboards.genie`, `files.files`, `serving.serving-endpoints`.
+- Scopes demandés par l'app : `ai-gateway`, `sql`, `dashboards.genie`, `files`, `serving.serving-endpoints`.
 - Échec fermé : si le jeton utilisateur est refusé (scopes pas encore acceptés), la demande s'arrête et l'utilisateur est invité à se reconnecter. L'app ne répond jamais avec les droits de son principal de service, sauf si `security.obo_fallback_to_app: true` est explicitement configuré ; dans ce cas l'écran l'affiche et la trace porte `obo_refused`.
 - Identité : l'app lit `x-forwarded-email` posé par le proxy Databricks Apps ; sans cet en-tête, elle répond 401 (sauf en développement local, hors Apps).
 
@@ -76,6 +76,12 @@ Les décisions des politiques n'apparaissent pas dans `system.ai_gateway.usage` 
 
 Par défaut (`security.trace_content: redacted`), les traces gardent le début des textes longs (documents, résultats d'outils, raisonnement) avec leur taille et une empreinte SHA-256, pas leur contenu intégral ; les journaux de l'app ne contiennent pas le contenu des documents. `trace_content: full` conserve tout (utile en recette, à réserver à un schéma à accès restreint). Les requêtes restent visibles dans les tables d'inférence et le tableau de bord : restreignez l'accès au schéma.
 
+## Bibliothèques : les droits Unity Catalog, rien de plus
+
+Avec l'OBO, l'application liste, lit et ajoute les documents des bibliothèques avec le jeton de l'utilisateur (scope `files`, Files API). Unity Catalog décide : `READ VOLUME` pour lire une bibliothèque, `WRITE VOLUME` pour y ajouter. Un refus est affiché comme tel et n'est jamais retenté avec l'identité de l'application. La recherche ne renvoie que des passages des bibliothèques que l'utilisateur peut lire (contrôlé par son jeton). L'index de recherche est construit par l'application, qui a `READ VOLUME` sur les bibliothèques et rien d'autre.
+
+Les fichiers personnels (pièces jointes, livrables) restent dans le volume des fichiers, servis par l'application et confinés par utilisateur : les droits Unity Catalog s'appliquent à un volume entier, pas à un dossier, et donner aux utilisateurs l'accès direct à ce volume leur ouvrirait les fichiers des autres.
+
 ## Droits accordés au déploiement
 
 Déclarés dans le bundle (`bundle/resources/*.yml`), donc relus et réappliqués à chaque déploiement ; un test vérifie qu'aucun autre droit n'est donné à l'app. Principal de service de l'application, au plus juste :
@@ -85,7 +91,8 @@ Déclarés dans le bundle (`bundle/resources/*.yml`), donc relus et réappliqué
 | Catalogue | `USE CATALOG` | `install/install.py`, phase `govern` (le catalogue existe avant le bundle) |
 | Schéma `<schema>` | `USE SCHEMA` (pas de `SELECT`/`MODIFY` au niveau du schéma) | bundle |
 | Schéma `<traces_schema>` | `USE SCHEMA`, `SELECT`, `MODIFY` : seul endroit où l'app écrit des tables (spans MLflow) | bundle |
-| Volume `<volume>` | `READ VOLUME`, `WRITE VOLUME` | bundle |
+| Volume `<volume>` (fichiers personnels) | `READ VOLUME`, `WRITE VOLUME` | bundle |
+| Volumes des bibliothèques | `READ VOLUME` (indexation) | bundle (`resources/libraries.yml`, généré depuis `libraries`) |
 | Service de modèles de l'assistant | `EXECUTE` (appels quand l'OBO est désactivé ou en secours) | bundle |
 | Fonction de la politique personnalisée | `EXECUTE` | phase `govern` |
 | Expérience MLflow, warehouse, base Lakebase | `CAN_MANAGE`, `CAN_USE`, `CAN_CONNECT_AND_CREATE` | ressources de l'app dans le bundle (accordées par Databricks Apps) |

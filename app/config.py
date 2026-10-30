@@ -24,7 +24,12 @@ LOGOS = B["logos"]                         # URL paths under /brand/
 APP_ID = re.sub(r"[^a-z0-9]+", "-", BRAND.lower()).strip("-")
 
 UC = S["uc"]
-FILES_VOLUME, LIBRARY, GENERATED, UPLOADS = UC["files_root"], UC["library"], UC["generated"], UC["uploads"]
+FILES_VOLUME, GENERATED, UPLOADS = UC["files_root"], UC["generated"], UC["uploads"]
+# document libraries: one UC volume each, read with the user's identity (Unity Catalog decides who sees which library)
+LIBRARIES = UC.get("libraries") or [{"id": "bibliotheque", "label": "Bibliothèque", "root": UC["library"]}]
+LIBRARY = LIBRARIES[0]["root"]            # default library (uploads by curators go here unless another is chosen)
+LIBRARY_ROOTS = tuple(l["root"] for l in LIBRARIES)
+WAREHOUSE_ID = os.environ.get("MLFLOW_TRACING_SQL_WAREHOUSE_ID") or (S.get("observability") or {}).get("warehouse_id", "")
 
 MODEL = S["models"]["assistant"]
 MAX_OUTPUT_TOKENS = int(S["models"].get("max_output_tokens", 64000))

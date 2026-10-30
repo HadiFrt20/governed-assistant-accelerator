@@ -62,8 +62,14 @@ def appmod(monkeypatch):
 
     monkeypatch.setattr(appmod, "files_api", files_api)
     monkeypatch.setattr(appmod, "sp_token", lambda: "sp-token")
-    appmod._real_library_tree = getattr(appmod, "_real_library_tree", appmod.library_tree)
-    monkeypatch.setattr(appmod, "library_tree", lambda: [])
+    import library  # libraries: Files API with the user's token, faked here (library.py itself is tested in test_library.py)
+    lib_calls = []
+    monkeypatch.setattr(library, "tree", lambda token: [])
+    monkeypatch.setattr(library, "fetch", lambda path, token: lib_calls.append(("GET", path, token)) or (b"%PDF lib", ""))
+    monkeypatch.setattr(library, "put", lambda path, data, token: lib_calls.append(("PUT", path, token)))
+    monkeypatch.setattr(library, "start_indexer", lambda *a, **k: None)
+    monkeypatch.setattr(library, "wake", lambda: None)
+    appmod._lib_calls = lib_calls
     appmod._calls, appmod._db = calls, db
     appmod.LIVE = type(appmod.LIVE)()
     return appmod
@@ -78,4 +84,4 @@ def client(appmod):
 
 def hdr(user="alice@acme.com", **extra):
     """Headers of a same-origin browser request as forwarded by the Databricks Apps proxy."""
-    return {"x-forwarded-email": user, "sec-fetch-site": "same-origin", **extra}
+    return {"x-forwarded-email": user, "x-forwarded-access-token": f"tok-{user}", "sec-fetch-site": "same-origin", **extra}

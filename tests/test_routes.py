@@ -19,7 +19,7 @@ def test_index_sets_csp_and_ai_notice(client):
 
 def test_library_download_blocks_traversal_without_fetching(client, appmod):
     r = client.get("/api/library/download", params={"path": f"{config.LIBRARY}/../uploads/bob/secret.pdf"}, headers=hdr())
-    assert r.status_code == 403 and appmod._calls == []
+    assert r.status_code == 403 and appmod._calls == [] and appmod._lib_calls == []
 
 
 def test_send_rejects_attachment_outside_own_folder(client, appmod, monkeypatch):
@@ -67,9 +67,42 @@ def test_upload_rejects_executable_types(client):
     assert r.status_code == 403
 
 
-def test_library_upload_requires_curator(client, appmod):
-    r = client.post("/api/library/upload", files={"file": ("x.docx", io.BytesIO(b"x"), "application/octet-stream")}, data={"folder": "../../x"}, headers=hdr("eve@acme.com"))
-    assert r.status_code == 403 and appmod._calls == []
+def test_library_upload_is_decided_by_unity_catalog(client, appmod, monkeypatch):
+    """With OBO the document is written with the user's own token: Unity Catalog (WRITE VOLUME) decides, the app adds no right."""
+    import library
+    def refuse(path, data, token):
+        raise library.LibraryError("Unity Catalog refuse l'ajout")
+    monkeypatch.setattr(library, "put", refuse)
+    r = client.post("/api/library/upload", files={"file": ("x.docx", io.BytesIO(b"x"), "application/octet-stream")}, data={"folder": "Q"}, headers=hdr("eve@acme.com"))
+    assert r.status_code == 403 and "Unity Catalog" in r.json()["error"] and appmod._calls == []
+
+
+def test_library_upload_uses_the_users_token_and_sanitises_the_path(client, appmod):
+    r = client.post("/api/library/upload", files={"file": ("Proc é.pdf", io.BytesIO(b"%PDF"), "application/pdf")}, data={"folder": "../../Qualité"}, headers=hdr())
+    assert r.status_code == 200
+    method, path, token = appmod._lib_calls[-1]
+    assert method == "PUT" and token == "tok-alice@acme.com" and ".." not in path and path.startswith(config.LIBRARY + "/")
+
+
+def test_library_upload_without_obo_falls_back_to_the_curator_list(client, appmod, monkeypatch):
+    import security as sec
+    monkeypatch.setitem(config.S, "obo", False)
+    monkeypatch.setattr(appmod, "sp_token", lambda: "sp-token")
+    monkeypatch.setattr(sec, "LIBRARY_CURATORS", {"alice@acme.com"})
+    assert client.post("/api/library/upload", files={"file": ("x.pdf", io.BytesIO(b"%PDF"), "application/pdf")}, headers=hdr("eve@acme.com")).status_code == 403
+    assert client.post("/api/library/upload", files={"file": ("x.pdf", io.BytesIO(b"%PDF"), "application/pdf")}, headers=hdr()).status_code == 200
+    assert appmod._lib_calls[-1][2] == "sp-token"
+
+
+def test_library_download_reads_with_the_users_token(client, appmod):
+    r = client.get("/api/library/download", params={"path": f"{config.LIBRARY}/Q/proc.pdf"}, headers=hdr())
+    assert r.status_code == 200 and appmod._lib_calls == [("GET", f"{config.LIBRARY}/Q/proc.pdf", "tok-alice@acme.com")]
+
+
+def test_libraries_need_the_user_token_with_obo(client, appmod):
+    h = hdr()
+    h.pop("x-forwarded-access-token")
+    assert client.get("/api/library", headers=h).status_code == 403
 
 
 def test_file_download_requires_ownership_and_sandboxes_html(client, appmod):

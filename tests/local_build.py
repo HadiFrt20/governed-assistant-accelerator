@@ -13,7 +13,8 @@ import settings  # noqa: E402,F401
 def build(brand_name, out):
     cfg = yaml.safe_load(open(ROOT / "config/assistant.yaml"))
     bdir = ROOT / "brands" / brand_name
-    brand = yaml.safe_load(open(bdir / "brand.yaml"))
+    import design
+    brand = design.apply(yaml.safe_load(open(bdir / "brand.yaml")), bdir)
     out = Path(out)
     if out.exists():
         shutil.rmtree(out)

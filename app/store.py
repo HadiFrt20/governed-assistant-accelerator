@@ -43,6 +43,13 @@ ALTER TABLE assistant.turns ADD COLUMN IF NOT EXISTS doc_tsv tsvector
 CREATE INDEX IF NOT EXISTS turns_fts ON assistant.turns USING gin (doc_tsv);
 CREATE UNIQUE INDEX IF NOT EXISTS files_user_name ON assistant.files(user_email, name);
 CREATE INDEX IF NOT EXISTS files_conv ON assistant.files(conversation_id);
+CREATE TABLE IF NOT EXISTS assistant.doc_cache (
+  path TEXT PRIMARY KEY, sha256 TEXT NOT NULL, modified TEXT, parser TEXT, text TEXT, parsed_at TIMESTAMPTZ DEFAULT now());
+CREATE TABLE IF NOT EXISTS assistant.library_chunks (
+  path TEXT NOT NULL, library TEXT NOT NULL, page INT NOT NULL, content TEXT NOT NULL, modified TEXT,
+  tsv tsvector GENERATED ALWAYS AS (to_tsvector('french', content)) STORED);
+CREATE INDEX IF NOT EXISTS chunks_fts ON assistant.library_chunks USING gin (tsv);
+CREATE INDEX IF NOT EXISTS chunks_path ON assistant.library_chunks(path);
 """
 BM25 = {"on": False}
 

@@ -310,3 +310,25 @@ def test_every_dashboard_query_is_fully_qualified():
         q = "".join(ds.get("queryLines") or [ds.get("query", "")])
         for name in re.findall(r"(?i)\b(?:FROM|JOIN)\s+([A-Za-z_][\w.]*)", q):
             assert name.count(".") == 2 or name.startswith("system."), f"{ds['displayName']}: {name} is not catalog.schema.table"
+
+
+def test_library_volumes_carry_the_access_control(ctx):
+    cfg = base_cfg()
+    cfg["libraries"] = [{"name": "bibliotheque", "label": "Bibliothèque"}, {"name": "qualite", "readers": "qualite-users", "curators": "qualite-leads"}]
+    c = ctx(cfg)
+    vols = yaml.safe_load(ins.libraries_yaml(c))["resources"]["volumes"]
+    g = {k: {x["principal"]: set(x["privileges"]) for x in v["grants"]} for k, v in vols.items()}
+    sp = "${resources.apps.assistant.service_principal_client_id}"
+    assert g["library_qualite"] == {sp: {"READ_VOLUME"}, "qualite-users": {"READ_VOLUME"}, "qualite-leads": {"READ_VOLUME", "WRITE_VOLUME"}}
+    assert g["library_bibliotheque"]["account users"] == {"READ_VOLUME"}
+    assert g["library_bibliotheque"]["${workspace.current_user.userName}"] == {"READ_VOLUME", "WRITE_VOLUME"}  # default curator: the deployer
+    cfg["app"]["obo"] = False
+    vols = yaml.safe_load(ins.libraries_yaml(ctx(cfg)))["resources"]["volumes"]
+    assert set(next(x for x in vols["library_qualite"]["grants"] if x["principal"] == sp)["privileges"]) == {"READ_VOLUME", "WRITE_VOLUME"}
+
+
+def test_library_names_are_validated():
+    cfg = base_cfg()
+    cfg["libraries"] = [{"name": "fichiers"}, {"name": "Bad-Name"}]
+    keys = {k for k, _, _ in ins.validate_config(cfg, ROOT / "brands" / "acme")}
+    assert {"libraries.fichiers", "libraries.Bad-Name"} <= keys

@@ -1,0 +1,26 @@
+#!/bin/sh
+# Assistant interne gouverné : les commandes dont vous avez besoin.
+#   ./assistant init                         questions guidées : marque, connexion Databricks, emplacement (2 minutes)
+#   ./assistant deploy  config/<x>.local.yaml installe ou met à jour tout, puis vérifie en conditions réelles
+#   ./assistant check   config/<x>.local.yaml contrôle sans rien modifier
+#   ./assistant test    config/<x>.local.yaml recette complète (environ 30 minutes)
+#   ./assistant remove  config/<x>.local.yaml supprime tout ce qui a été installé
+set -e
+cd "$(dirname "$0")"
+need() { command -v "$1" >/dev/null 2>&1 || { echo "$2"; exit 1; }; }
+need uv "uv n'est pas installé : curl -LsSf https://astral.sh/uv/install.sh | sh  (puis rouvrez le terminal)"
+need databricks "La CLI Databricks n'est pas installée : brew install databricks  (ou https://docs.databricks.com/dev-tools/cli/install)"
+run() { uv run -q --python 3.11 --with-requirements requirements-dev.txt python "$@"; }
+cmd="${1:-help}"; shift 2>/dev/null || true
+case "$cmd" in
+  init)   run install/init.py "$@" ;;
+  deploy) [ -n "$1" ] || { echo "usage : ./assistant deploy config/<x>.local.yaml"; exit 2; }; c="$1"; shift; run install/install.py --config "$c" "$@" ;;
+  check)  [ -n "$1" ] || { echo "usage : ./assistant check config/<x>.local.yaml"; exit 2; }; run install/install.py --config "$1" --plan ;;
+  test)   [ -n "$1" ] || { echo "usage : ./assistant test config/<x>.local.yaml"; exit 2; }; c="$1"; shift; run tests/live/acceptance.py --config "$c" "$@" ;;
+  remove) [ -n "$1" ] || { echo "usage : ./assistant remove config/<x>.local.yaml"; exit 2; }
+          echo "Cela supprime l'app, l'historique des conversations, les bibliothèques et leurs documents, les traces et le tableau de bord."
+          printf "Tapez SUPPRIMER pour confirmer : "; read -r ok; [ "$ok" = "SUPPRIMER" ] || { echo "annulé"; exit 1; }
+          run install/install.py --config "$1" --destroy --yes ;;
+  design) run install/design.py "$@" ;;
+  *) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//' ;;
+esac

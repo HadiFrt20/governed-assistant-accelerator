@@ -483,16 +483,34 @@ let libFolder = 'Tous';
 async function libraryView() {
   history.replaceState(null, '', '#bibliotheque');
   conv = null; nav('n-lib'); title('Bibliothèque {{COMPANY}}'); $('dock').innerHTML = ''; loadHist();
-  const docs = await api('/api/library'), folders = ['Tous', ...new Set(docs.map(d => d.folder || 'Général'))];
-  const shown = docs.filter(d => libFolder === 'Tous' || (d.folder || 'Général') === libFolder);
-  const label = f => ({Qualite:'Qualité', Modeles:'Modèles'}[f] || f);
-  $('view').innerHTML = `<div class="ph"><div><h1>Bibliothèque {{COMPANY}}</h1><p>Procédures, standards, comptes rendus et modèles que l'assistant peut lire.</p></div>
+  const docs = await api('/api/library');
+  const list = Array.isArray(docs) ? docs : [];
+  // several libraries (one UC volume each, visible according to your rights): filter by library; a single one: by folder
+  const libs = [...new Map(list.map(d => [d.library, d.library_label || d.library])).entries()];
+  const multi = libs.length > 1, group = d => multi ? (d.library_label || d.library) : (d.folder || 'Général');
+  const chips = ['Tous', ...new Set(list.map(group))];
+  if (!chips.includes(libFolder)) libFolder = 'Tous';
+  const shown = list.filter(d => libFolder === 'Tous' || group(d) === libFolder);
+  const empty = !list.length ? `<p class="muted">${Array.isArray(docs) ? "Aucun document accessible : demandez à un responsable d'ajouter des documents, ou de vous donner accès à une bibliothèque." : esc(docs.error || 'Bibliothèque indisponible')}</p>` : '';
+  $('view').innerHTML = `<div class="ph"><div><h1>Bibliothèque {{COMPANY}}</h1><p>Procédures, chartes, comptes rendus et modèles que l'assistant peut lire et citer. Vous voyez les documents auxquels vous avez droit.</p></div>
      <label class="btn">＋ Ajouter un document<input type="file" hidden onchange="libUp(this.files[0])"></label></div>
-   <div class="fchips">${folders.map(f => `<button class="${f === libFolder ? 'on' : ''}" onclick="libFolder=${jsarg(f)};libraryView()">${esc(label(f))}</button>`).join('')}</div>
-   <div class="lib">${shown.map(d => `<div class="lr">${ficon(ext(d.name))}<div class="nm">${esc(prettyName(d.name))}<small>${label(d.folder || 'Général')} · ${d.modified ? new Date(d.modified).toLocaleDateString('fr-FR') : ''}</small></div>
+   <div class="fchips">${chips.map(f => `<button class="${f === libFolder ? 'on' : ''}" onclick="libFolder=${jsarg(f)};libraryView()">${esc(f)}</button>`).join('')}</div>
+   ${empty}<div class="lib">${shown.map(d => `<div class="lr">${ficon(ext(d.name))}<div class="nm">${esc(prettyName(d.name))}<small>${esc(multi ? (d.library_label || '') + (d.folder ? ' · ' + d.folder : '') : (d.folder || 'Général'))} · ${d.modified ? new Date(d.modified).toLocaleDateString('fr-FR') : ''}</small></div>
      <div class="acts"><a class="btn" href="/api/library/download?path=${encodeURIComponent(d.path)}">Ouvrir</a><button class="btn p" onclick="useDoc(${jsarg(d.path)}, ${jsarg(d.name)})">Utiliser</button></div></div>`).join('')}</div>`;
+  window._libs = libs;
 }
-async function libUp(f) { if (!f) return; const fd = new FormData(); fd.append('file', f); fd.append('folder', libFolder === 'Tous' ? 'Qualite' : libFolder); await fetch('/api/library/upload', {method:'POST', body:fd}); libraryView(); }
+async function libUp(f) {
+  if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  const libs = window._libs || [], multi = libs.length > 1;
+  const target = multi ? libs.find(([, label]) => label === libFolder) : null;
+  if (multi && !target) { alert("Choisissez d'abord la bibliothèque où ajouter le document (filtre en haut)."); return; }
+  if (target) fd.append('library_id', target[0]);
+  fd.append('folder', !multi && libFolder !== 'Tous' ? libFolder : 'General');
+  const r = await fetch('/api/library/upload', {method: 'POST', body: fd});
+  if (!r.ok) { let e = ''; try { e = (await r.json()).error; } catch (_) {} alert(`« ${f.name} » n'a pas été ajouté : ${e || 'erreur ' + r.status}`); }
+  libraryView();
+}
 boot();
 </script>
 </body>

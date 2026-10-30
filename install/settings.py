@@ -19,6 +19,14 @@ def traces_schema(cfg):
     return uc.get("traces_schema") or f"{uc['schema']}_traces"
 
 
+def libraries(cfg):
+    """Document libraries: one UC volume each in the assistant schema. Defaults to a single « Bibliothèque »."""
+    uc = cfg["unity_catalog"]
+    libs = cfg.get("libraries") or [{"name": "bibliotheque", "label": "Bibliothèque"}]
+    return [{"id": l["name"], "label": l.get("label") or l["name"].replace("_", " ").capitalize(),
+             "root": f"/Volumes/{uc['catalog']}/{uc['schema']}/{l['name']}", "readers": l.get("readers"), "curators": l.get("curators")} for l in libs]
+
+
 def policy_descriptions(cfg):
     g = cfg["governance"]
     b = g.get("builtin_policies", {})
@@ -51,7 +59,9 @@ def build(cfg, brand, templates, me=None):
     return {
         "brand": b,
         "uc": {"catalog": catalog, "schema": schema, "volume": volume, "files_root": root,
-               "library": f"{root}/library", "generated": f"{root}/generated", "uploads": f"{root}/uploads"},
+               "libraries": [{k: l[k] for k in ("id", "label", "root")} for l in libraries(cfg)],
+               "generated": f"{root}/generated", "uploads": f"{root}/uploads"},
+        "documents": {"parser": (cfg.get("documents") or {}).get("parser", "auto")},
         "models": {"assistant": svc("assistant"), "developer": svc("developer"),
                    "max_output_tokens": cfg["models"].get("max_output_tokens", 64000), "effort": cfg["models"].get("effort", "medium")},
         "data": {"genie_one": cfg["data"].get("genie_one", True), "scope": cfg["data"].get("scope", "")},

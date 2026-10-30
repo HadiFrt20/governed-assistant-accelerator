@@ -1,0 +1,42 @@
+# Defaults for every setting not given in config/<env>.yaml: a minimal configuration (profile, warehouse, catalog, brand, app
+# name) deploys a complete, governed assistant. Override any key in your config; see config/assistant.yaml for the full reference.
+unity_catalog:
+  volume: fichiers
+app:
+  obo: true
+access:
+  users_group: account users
+libraries:
+  - name: bibliotheque
+    label: Bibliothèque
+documents:
+  parser: auto
+models:
+  assistant:
+    service: assistant_bureautique
+    model: system.ai.databricks-claude-sonnet-5-5
+  max_output_tokens: 64000
+  effort: medium
+governance:
+  rate_limit_per_user_per_minute: 60
+  ip_leak_policy:
+    name: anti-fuite-pi
+    keywords: ["strictement confidentiel", "secret industriel", "diffusion restreinte"]
+    reason: "Document marqué confidentiel : son envoi à un modèle d'IA est interdit."
+  builtin_policies:
+    jailbreak: true
+    unsafe_content: true
+    sensitive_data:
+      action: transform
+      categories: [class.email_address, class.phone_number, class.iban_code, class.credit_card]
+data:
+  genie_one: true
+  scope: "les données métier gouvernées par Unity Catalog"
+observability:
+  mlflow_experiment: "/Users/{me}/{app}-traces"
+  usage_job_cron: "0 5 * * * ?"
+  timezone: Europe/Paris
+pricing:
+  claude-sonnet-5-5: [2.0, 10.0]
+  claude-opus-5-5: [4.0, 20.0]
+  default: [2.0, 10.0]

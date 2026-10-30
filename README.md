@@ -3,40 +3,56 @@
 > Un assistant interne « type GPT », aux couleurs du client, qui tourne entièrement dans Databricks et dont chaque appel passe par Unity AI Gateway.
 > *English summary at the end of this file.*
 
-## Ce que c'est
+## Démarrer en 3 étapes
 
-Une Databricks App prête à déployer chez un client, qui donne aux métiers :
+Aucune compétence Databricks n'est nécessaire pour installer. Il faut un espace Databricks et un ordinateur avec un terminal.
 
-- un **chat** en français avec historique, épingles et recherche plein texte ;
-- des **réponses chiffrées sur les données de l'entreprise** via **Genie One** (MCP), avec les droits de l'utilisateur et un lien « Approfondir dans Genie One » ;
-- la **lecture des documents joints** (Word, PowerPoint, PDF) par l'application elle-même ;
-- la **production de livrables** : PowerPoint et Word au modèle du client (dont un rapport 8D), et **pages web interactives** (cartographies, tableaux de bord) dans un design system imposé.
+```bash
+./assistant init                              # 2 minutes : nom de l'entreprise, nom de l'assistant, couleur et logo (facultatifs)
+./assistant deploy config/<entreprise>.local.yaml   # 15 à 25 minutes : installe tout, puis vérifie que tout fonctionne
+```
 
-Et à la DSI :
+3. Ouvrez l'adresse affichée à la fin. C'est prêt. Guide pas à pas : [docs/DEMARRAGE.md](docs/DEMARRAGE.md).
 
-- **un seul point de contrôle** : tous les appels modèle passent par des *model services* Unity AI Gateway, avec politiques (anti-fuite PI par fonction UC, anti-jailbreak, contenu inapproprié, **anonymisation** des données sensibles), limites de débit et tables d'inférence ;
-- **l'identité de l'utilisateur** (OBO) sur les appels modèle, Genie One et SQL ;
-- **la traçabilité** : une trace MLflow par demande (lecture des documents, raisonnement du modèle, décision des politiques, appels d'outils, Genie One, génération, réponse finale, coût estimé), stockée dans des tables Unity Catalog ;
-- **le pilotage** : un tableau de bord AI/BI (adoption, usages classés par `ai_classify`, coûts, blocages, latence).
+Les questions sont en français ; la connexion à Databricks, l'entrepôt SQL et l'emplacement sont détectés. Tout le reste a une valeur par défaut sûre : garde-fous actifs, anonymisation, traçabilité, tableau de bord. Rien n'est à configurer pour commencer.
+
+## Ce que vos équipes obtiennent
+
+- un **chat** en français avec historique, épingles et recherche ;
+- des **réponses chiffrées sur les données de l'entreprise** (Genie One), avec les droits de chacun ;
+- une **bibliothèque documentaire** : l'assistant cherche dans vos procédures et documents internes, les lit (texte, tableaux, figures) et **cite la page** ; chacun ne voit que les bibliothèques auxquelles il a droit ;
+- des **livrables** prêts à diffuser : PowerPoint, Word, pages web interactives, **à vos couleurs** (votre design system peut être importé depuis Figma ou un fichier CSS).
+
+## Ce que la DSI obtient
+
+- **les droits Databricks partout** : la bibliothèque, les données et les modèles sont lus avec l'identité de l'utilisateur ; Unity Catalog décide, l'application n'ajoute aucun droit ;
+- **un seul point de contrôle pour l'IA** : tous les appels modèle passent par Unity AI Gateway (anti-fuite, anti-jailbreak, contenu inapproprié, **anonymisation** des données personnelles, limites de débit, journal des requêtes) ;
+- **la traçabilité** : une trace MLflow par demande, stockée dans Unity Catalog, coût compris ;
+- **le pilotage** : un tableau de bord d'usage et de gouvernance ;
+- **un déploiement sans surprise** : tout est décrit dans un Databricks Asset Bundle, vérifié avant et après, réversible (`./assistant remove`).
+
+Seules des fonctions Databricks disponibles pour tous (GA) sont activées par défaut. Les fonctions en préversion (validation humaine des actions des agents, évaluation continue par des juges IA, recherche BM25 Lakebase) sont des options documentées : [docs/OPERATIONS.md](docs/OPERATIONS.md#options).
 
 ## Architecture
 
 ```
-Utilisateurs (SSO) ──► Databricks App (FastAPI + UI de marque, OBO)
+Utilisateurs (SSO) ──► Databricks App (FastAPI + UI de marque, identité de l'utilisateur)
                          │
                          ├─ Routeur : question de données → Genie One (réponse courte + lien)
                          │            sinon → agent (Claude) + outils
                          │
-                         ├─ Unity AI Gateway ── politiques : anti-fuite PI (fonction UC), jailbreak,
+                         ├─ Unity AI Gateway ── politiques : anti-fuite (fonction UC), jailbreak,
                          │   (model services)    contenu, anonymisation ; limites ; tables d'inférence
-                         │      ├─ Claude (assistant bureautique)
-                         │      ├─ Genie One MCP ──► tables Unity Catalog (droits de l'utilisateur)
+                         │      ├─ Claude (assistant)        ├─ Genie One MCP ──► tables UC (droits de l'utilisateur)
                          │      └─ modèle de code (agents de développement, optionnel)
                          │
-                         ├─ Générateurs : PowerPoint / Word (modèles de marque), pages HTML (design system)
-                         │      └─► volume Unity Catalog (bibliothèque, générés, téléversés)
-                         ├─ Lakebase (Postgres) : conversations, épingles, recherche BM25
-                         └─ MLflow Tracing ──► tables UC <catalog>.<schema>.assistant_otel_*
+                         ├─ Bibliothèques = volumes UC, lus avec le jeton de l'utilisateur (Files API)
+                         │      ├─ ai_parse_document (texte, tableaux, figures, pages) ── cache Lakebase
+                         │      └─ index plein texte Lakebase ──► search_library (passages + page, filtrés par droits)
+                         ├─ Générateurs : PowerPoint / Word (modèles de marque), pages HTML (design system + contrôle avant publication)
+                         │      └─► volume UC des fichiers personnels (générés, téléversés), confinés par utilisateur
+                         ├─ Lakebase (Postgres) : conversations, épingles, recherche
+                         └─ MLflow Tracing ──► tables UC <catalog>.<schema>_traces.assistant_otel_*
 
 system.ai_gateway.usage + historique ──► job horaire (ai_classify) ──► tableau de bord AI/BI
 ```
@@ -45,7 +61,7 @@ Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Prérequis
 
-- Un espace de travail Databricks avec : **Unity AI Gateway** (model services et politiques), **Genie One** et son serveur MCP `system.ai.genie_one_mcp`, **Lakebase Autoscaling** (avec Lakebase Search pour le BM25), **Databricks Apps**, **MLflow 3** (traces dans Unity Catalog).
+- Un espace de travail Databricks avec : **Unity AI Gateway** (model services et politiques), **Genie One** et son serveur MCP `system.ai.genie_one_mcp`, **Lakebase Autoscaling**, **Databricks Apps**, **MLflow 3** (traces dans Unity Catalog), les **AI Functions** (`ai_parse_document`, `ai_classify`). Le contrôle préalable (`./assistant check`) vérifie chacun et dit quoi activer s'il manque quelque chose.
 - Un **catalogue** Unity Catalog existant où vous avez les droits de créer un schéma, un volume, des fonctions et des tables.
 - Un **SQL warehouse**.
 - La **CLI Databricks** configurée avec un profil (`databricks auth login -p <profil>`), et Python 3.11+.
@@ -72,7 +88,7 @@ uv run --python 3.11 --with-requirements requirements-dev.txt python install/ins
 | `start` | `bundle run` de l'app (déploiement du code et démarrage) |
 | `verify` | santé de l'app, blocage effectif (politique anti-fuite et anti-jailbreak), anonymisation d'un e-mail, une vraie demande de bout en bout, spans présents dans les tables de traces UC, exécution du job d'usage et couche gold non vide |
 
-Recette complète après déploiement (23 contrôles en conditions réelles) : `tests/live/acceptance.py`, voir [docs/OPERATIONS.md](docs/OPERATIONS.md).
+Recette complète après déploiement (27 contrôles en conditions réelles) : `tests/live/acceptance.py`, voir [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 Un échec arrête le déploiement avec la phase, la cause, la correction et la commande de reprise (`--from <phase>`). Chaque commande et sa sortie sont dans `build/<app>.deploy.log` (jetons masqués), le bilan dans `build/<app>.deploy.json`. Les codes de sortie distinguent la phase (2 configuration ou contrôles, 3 build, 4 deploy, 5 govern, 6 start, 7 verify). Relancer est sans risque : toutes les étapes sont idempotentes. `--destroy --yes` supprime tout ce que le déploiement a créé.
 

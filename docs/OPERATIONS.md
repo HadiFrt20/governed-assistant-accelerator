@@ -10,7 +10,7 @@ La phase `verify` prouve le déploiement en conditions réelles : santé de l'ap
 
 ### Recette complète en conditions réelles
 
-Après un déploiement, `tests/live/acceptance.py` passe par l'app déployée comme un utilisateur, puis contrôle tout ce qu'il y a derrière (environ 30 minutes, 23 contrôles indépendants, rapport `build/<app>.acceptance.json`, code de sortie 1 si un contrôle échoue) :
+Après un déploiement, `tests/live/acceptance.py` passe par l'app déployée comme un utilisateur, puis contrôle tout ce qu'il y a derrière (environ 30 minutes, 27 contrôles indépendants, rapport `build/<app>.acceptance.json`, code de sortie 1 si un contrôle échoue) :
 
 ```bash
 uv run --python 3.11 --with-requirements requirements-dev.txt python tests/live/acceptance.py --config config/<env>.local.yaml [--only data,generators]
@@ -108,3 +108,15 @@ Trois onglets : adoption et usages (`ai_classify` du type d'usage et du métier)
 ## Coût des pièces jointes dans une conversation
 
 Le texte des documents joints reste dans l'historique de la conversation et repart avec chaque demande suivante. C'est voulu : les questions de suivi (« et la section 3 ? ») en ont besoin, et réécrire l'historique après coup invaliderait les blocs de raisonnement du modèle. Le coût est borné : 200 000 caractères de documents par demande, et l'app arrête proprement une conversation devenue trop longue (environ 700 000 caractères) en invitant à en ouvrir une nouvelle. Pour une question ponctuelle sur un gros document, ouvrez une nouvelle conversation.
+
+
+## Options
+
+Activées par défaut : uniquement des fonctions Databricks disponibles pour tous. Les options ci-dessous sont en préversion ou ont un effet irréversible ; elles restent désactivées tant que vous ne les demandez pas.
+
+| Option | Statut (octobre 2026) | Ce qu'elle apporte | Pourquoi elle n'est pas activée par défaut |
+|---|---|---|---|
+| Recherche BM25 Lakebase (Lakebase Search) | réglage du projet Lakebase | meilleur classement des passages et de l'historique ; l'application l'utilise dès que l'extension `lakebase_text` est installée | l'activation redémarre les calculs du projet et ne peut pas être annulée |
+| Validation humaine (ASK) des actions des agents | Beta (politiques de service, préversion à activer) | un outil d'agent attend l'accord de l'utilisateur avant de s'exécuter | Beta ; s'applique aux services MCP, et l'enregistrement d'une app comme service MCP gouverné n'est pas documenté |
+| Évaluation continue par des juges IA (MLflow) | Beta | note automatique des réponses sur les traces Unity Catalog | Beta ; demande un warehouse de supervision |
+| Masques de colonnes et filtres de lignes (ABAC, balises gouvernées) | GA | protection des données à la source, quel que soit le canal | à poser sur vos tables métier par leurs propriétaires ; la recette vérifie qu'un masque est respecté par Genie One |

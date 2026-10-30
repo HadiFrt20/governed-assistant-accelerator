@@ -11,7 +11,7 @@ unity_catalog:
   catalog: main                    # must exist; the bundle creates the schemas inside it
   schema: acme_assistant           # model services, policy function, history mirror, gold layer
   # traces_schema: acme_assistant_traces   # MLflow trace tables (default <schema>_traces): the only schema the app may write to
-  volume: fichiers                # library/, generated/, uploads/ are created inside
+  volume: fichiers                # personal files: generated/ (deliverables) and uploads/ (attachments), mediated by the app
 
 app:
   name: acme-assistant            # Databricks App name (lowercase, dashes)
@@ -19,6 +19,15 @@ app:
 
 access:
   users_group: account users      # may open the app and call the model services (EXECUTE); use a narrower group in production
+
+libraries:                        # shared document libraries, one UC volume each; Unity Catalog decides who reads which one
+  - name: bibliotheque
+    label: Bibliothèque
+    # readers: <group>               # default: access.users_group
+    # curators: <group or e-mail>    # may add documents (WRITE VOLUME); default: the person who deploys
+
+documents:
+  parser: auto                    # auto = Databricks ai_parse_document (text, tables, figures, pages) with built-in readers as fallback; builtin = built-in only
 
 models:
   # Governed model services created in Unity AI Gateway. The office assistant uses `assistant`.

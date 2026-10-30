@@ -111,20 +111,6 @@ def test_router_rules_and_llm_decision():
 
 
 # ---------- attachments ----------
-def test_read_attachments_confines_tolerates_and_caps(monkeypatch):
-    class R:
-        ok, status_code, content = True, 200, b"x"
-    monkeypatch.setattr(agent.requests, "get", lambda *a, **k: R())
-    monkeypatch.setattr(agent.docs, "extract", lambda name, data: (_ for _ in ()).throw(ValueError("chiffré")) if name.startswith("bad") else "y" * 150_000)
-    uf = security.user_folder("alice@acme.com")
-    j = {"events": [], "messages": [{"role": "user", "content": "q"}]}
-    agent.read_attachments(j, "sp", [{"name": "a.pdf", "path": f"{uf}/a.pdf"}, {"name": "bad.pdf", "path": f"{uf}/bad.pdf"},
-                                     {"name": "lib.pdf", "path": f"{config.LIBRARY}/lib.pdf"}], "q", uf)
-    content = j["messages"][-1]["content"]
-    assert len(content) < 205_000 and "limite par demande" in content
-    assert any("n'a pas pu être lu" in e["text"] for e in j["events"] if e["type"] == "error")
-    with pytest.raises(security.Forbidden):
-        agent.read_attachments(j, "sp", [{"name": "x.pdf", "path": f"{security.user_folder('bob@acme.com')}/x.pdf"}], "q", uf)
 
 
 # ---------- tools end to end ----------
@@ -132,8 +118,8 @@ def test_create_html_tool_publishes_and_returns_published_facts(monkeypatch):
     from test_agent import FakeGateway, text, tool_use
     monkeypatch.setattr(agent, "upload", lambda token, name, data: f"{config.GENERATED}/{name}")
     j = {"events": [], "files": [], "answer": None, "messages": [{"role": "user", "content": "carte"}]}
-    spec = {"title": "Carte des capacités", "tabs": [{"id": "a", "label": "A"}], "body_html": '<section class="em-panel" id="a"></section>',
-            "data": {"caps": [{"status": "Couverte"}, {"status": "Partielle"}]}, "script": ""}
+    spec = {"title": "Carte des capacités", "tabs": [{"id": "a", "label": "A"}], "body_html": '<section class="em-panel" id="a"><div id="m"></div></section>',
+            "data": {"caps": [{"status": "Couverte"}, {"status": "Partielle"}]}, "script": "EM.capabilityMap('#m', {capabilities: DATA.caps});"}
     gw = FakeGateway(j, [tool_use("create_html", spec), text("Page publiée.")])
     agent.agent_loop(gw, j, "alice", None, "", "/x")
     f = j["files"][0]
@@ -313,36 +299,8 @@ def test_store_q_reconnects_once_then_raises(monkeypatch):
         store.q("SELECT 1")
 
 
-def test_curator_upload_sanitises_folder_and_never_overwrites(client, appmod, monkeypatch):
-    import security as sec
-    monkeypatch.setattr(sec, "LIBRARY_CURATORS", {"alice@acme.com"})
-    r = client.post("/api/library/upload", files={"file": ("Proc é.pdf", io.BytesIO(b"%PDF"), "application/pdf")}, data={"folder": "../../Qualité"}, headers=hdr())
-    assert r.status_code == 200
-    method, path = appmod._calls[-1]
-    assert method == "PUT" and "overwrite=false" in path and ".." not in path and path.startswith(f"files{config.LIBRARY}/")
 
 
-def test_library_tree_caches_and_keeps_last_listing_on_error(appmod, monkeypatch):
-    calls = {"n": 0}
-
-    class R:
-        def __init__(self, ok, contents=()):
-            self.ok, self.status_code, self._c = ok, 200 if ok else 503, list(contents)
-
-        def json(self):
-            return {"contents": self._c}
-
-    def files_api(method, path, **kw):
-        calls["n"] += 1
-        return R(True, [{"path": f"{config.LIBRARY}/Q/a.pdf", "name": "a.pdf", "is_directory": False}]) if calls["n"] == 1 else R(False)
-
-    monkeypatch.setattr(appmod, "files_api", files_api)
-    monkeypatch.setitem(appmod._LIB, "at", 0)
-    first = appmod._real_library_tree()
-    assert [d["name"] for d in first] == ["a.pdf"] and first[0]["folder"] == "Q"
-    assert appmod._real_library_tree() == first and calls["n"] == 1      # cached
-    appmod._LIB["at"] = 0                                                # cache expired, next listing fails
-    assert appmod._real_library_tree() == first and calls["n"] == 2      # last complete listing kept
 
 
 def test_sse_tool_input_reassembly_and_truncation():
@@ -529,18 +487,6 @@ def test_empty_model_reply_is_not_stored():
     assert not agent.history_is_complete([{"role": "assistant", "content": []}])
 
 
-def test_library_listing_follows_pagination(appmod, monkeypatch):
-    class R:
-        ok, status_code = True, 200
-        def __init__(self, body): self.body = body
-        def json(self): return self.body
-    def files_api(method, path, **kw):
-        if "page_token=p2" in path:
-            return R({"contents": [{"path": f"{config.LIBRARY}/b.pdf", "name": "b.pdf"}]})
-        return R({"contents": [{"path": f"{config.LIBRARY}/a.pdf", "name": "a.pdf"}], "next_page_token": "p2"})
-    monkeypatch.setattr(appmod, "files_api", files_api)
-    monkeypatch.setitem(appmod._LIB, "at", 0)
-    assert [d["name"] for d in appmod._real_library_tree()] == ["a.pdf", "b.pdf"]
 
 
 # ---------- round-8 coverage ----------
@@ -581,12 +527,6 @@ def test_genie_mcp_decodes_utf8(monkeypatch):
     assert g._call("genie_ask", {})["answer"] == "Données « ok » é"
 
 
-def test_library_network_errors_keep_last_listing(appmod, monkeypatch):
-    import requests as rq
-    monkeypatch.setattr(appmod, "files_api", lambda *a, **k: (_ for _ in ()).throw(rq.ConnectionError("down")))
-    monkeypatch.setitem(appmod._LIB, "at", 0)
-    monkeypatch.setitem(appmod._LIB, "items", [{"name": "kept.pdf"}])
-    assert appmod._real_library_tree() == [{"name": "kept.pdf"}]
 
 
 # ---------- round-9 coverage ----------
@@ -620,7 +560,9 @@ def test_xlsx_extraction():
 
 
 def test_config_endpoint(client):
-    r = client.get("/api/config", headers=hdr("jean.dupont@acme.com"))
+    h = hdr("jean.dupont@acme.com")
+    h.pop("x-forwarded-access-token")  # no user token forwarded: obo is reported off
+    r = client.get("/api/config", headers=h)
     body = r.json()
     assert r.status_code == 200 and body["brand"] == config.BRAND and body["company"] == config.COMPANY
     assert body["name"] == "Jean Dupont" and body["obo"] is False and body["departments"] == config.DEPARTMENTS

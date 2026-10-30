@@ -54,7 +54,7 @@ def digits(s):
 
 class Live:
     def __init__(self, config):
-        self.cfg = yaml.safe_load(open(config, encoding="utf-8"))
+        self.cfg = ins.load_config(config)  # same defaults as the deployment
         self.brand = yaml.safe_load(open(ROOT / "brands" / self.cfg["brand"] / "brand.yaml", encoding="utf-8"))
         v = ins.bundle_variables(self.cfg, self.brand)
         self.v, self.app = v, v["app_name"]
@@ -151,6 +151,15 @@ AS SELECT s.site, d.jour,
        CAST(pmod(hash(s.site, d.jour, 'lit'), 4) AS INT) AS litiges
 FROM (SELECT explode(array({", ".join(f"'{s}'" for s in SITES)})) AS site) s
 CROSS JOIN (SELECT explode(sequence(DATE'2026-09-01', DATE'2026-10-31', INTERVAL 1 DAY)) AS jour) d""")
+    # a column protected by a native Unity Catalog column mask: nobody outside the (non-existent) group sees it, wherever they ask from
+    L.sql(f"""CREATE OR REPLACE FUNCTION {L.demo}.masque_marge(v DOUBLE) RETURNS DOUBLE
+              COMMENT 'Marge visible uniquement par le contrôle de gestion' RETURN CASE WHEN is_account_group_member('gaa-controle-gestion') THEN v ELSE NULL END""")
+    L.sql(f"""CREATE OR REPLACE TABLE {L.demo}.marges_sites COMMENT 'Marge brute journalière par site (euros), confidentielle'
+              AS SELECT site, jour, CAST(10000 + pmod(hash(site, jour, 'mg'), 5000) AS DOUBLE) AS marge_brute_eur
+              FROM {L.demo}.operations_journalieres""")
+    L.sql(f"ALTER TABLE {L.demo}.marges_sites ALTER COLUMN marge_brute_eur SET MASK {L.demo}.masque_marge")
+    L.marge = int(L.sql(f"SELECT SUM(10000 + pmod(hash(site, jour, 'mg'), 5000)) FROM {L.demo}.operations_journalieres "
+                        f"WHERE site = 'Lyon' AND jour BETWEEN DATE'2026-09-01' AND DATE'2026-09-30'")[0][0])
     L.truth = {s: int(v) for s, v in L.sql(f"SELECT site, SUM(volume_expedie) FROM {L.demo}.operations_journalieres "
                                            f"WHERE jour BETWEEN DATE'2026-09-01' AND DATE'2026-09-30' GROUP BY site")}
     return f"{L.demo}.operations_journalieres · septembre : {L.truth}"
@@ -272,6 +281,14 @@ def data(L):
         return f"same Genie conversation, {L.truth['Marseille']} colis"
     L.check("data", "follow-up in the same Genie conversation", follow_up)
 
+    def masked():
+        q = f"Quelle est la marge brute totale du site de Lyon en septembre 2026 ? (table {L.demo}.marges_sites, colonne marge_brute_eur)"
+        j = L.ok_turn("genie_mask", L.turn("genie_mask", q))
+        raw = " ".join(e.get("text", "") for e in j["events"] if e.get("type") == "genie") + " " + j["answer"]
+        need(str(L.marge) not in digits(raw), f"the masked value {L.marge} reached the user: « {raw[:200]} »")
+        return f"masked column not revealed (true sum {L.marge} absent); Genie said « {j['answer'][:90]}… »"
+    L.check("data", "UC column mask respected by Genie One", masked)
+
 
 def documents(L):
     code = f"RCV-{RUN.upper()}"
@@ -297,6 +314,21 @@ def documents(L):
         need(L.lib_code in j["answer"] and "45" in j["answer"], f"« {j['answer'][:200]} »")
         return f"agent read it ({L.lib_code}, 45 min)"
     L.check("documents", "library document read by the agent", from_library)
+
+    def search():
+        need(getattr(L, "lib_path", None), "library upload failed")
+        deadline, j = time.time() + 300, {}
+        while time.time() < deadline:   # the app indexes a new library document within seconds of its upload (parse ≈ 10-20 s)
+            j = L.ok_turn("library_search", L.turn("library_search", "D'après nos documents internes, en combien de temps maximum un camion doit-il "
+                                                                       "être chargé au quai, et où isole-t-on les palettes abîmées ?"))
+            if "search" in L.tools(j) and "45" in j["answer"] and "Z3" in j["answer"]:
+                break
+            time.sleep(30)
+        need("search" in L.tools(j), f"search_library not used: tools {L.tools(j)}")
+        need("45" in j["answer"] and "Z3" in j["answer"], f"« {j['answer'][:200]} »")
+        need(L.lib_name.rsplit(".", 1)[0][:12] in j["answer"] or "p. 1" in j["answer"] or "page" in j["answer"].lower(), f"no citation: « {j['answer'][:200]} »")
+        return f"found without a path, cited: « {j['answer'][:110]}… »"
+    L.check("documents", "library search with citations", search)
 
 
 def download(L, f):
@@ -414,7 +446,8 @@ def history(L):
 
 
 EXPECTED_SPANS = {"genie": {"routeur", "genie_one", "reponse_finale"}, "attachment": {"lecture_documents", "politiques_ai_gateway", "reponse_finale"},
-                  "library_read": {"read_document"}, "pptx": {"create_pptx", "decision_outils"}, "docx": {"create_docx"}, "html": {"create_html"},
+                  "library_read": {"read_document"}, "library_search": {"search_library"}, "pptx": {"create_pptx", "decision_outils"},
+                  "docx": {"create_docx"}, "html": {"create_html", "design_lint"},
                   "pii": {"politiques_ai_gateway"}}
 
 
@@ -436,6 +469,25 @@ def traces(L):
         need(costed >= len([k for k in L.traces if k not in ("ip_leak", "jailbreak")]) - 1, f"cost recorded on {costed}/{len(names)} traces")
         return f"{len(names)} traces, expected spans present, cost on {costed}"
     L.check("traces", "spans per request in UC", spans)
+
+    def parser():
+        ids = ", ".join(f"'{L.traces[k]}'" for k in ("attachment", "library_read") if k in L.traces)
+        need(ids, "no document trace")
+        rows = L.sql(f"SELECT DISTINCT attributes:['mlflow.spanOutputs']['lecteur']::string FROM {L.spans} "
+                     f"WHERE trace_id IN ({ids}) AND (name = 'read_document' OR name LIKE 'lecture: %')")
+        used = {r[0] for r in rows if r[0]}
+        need("ai_parse_document" in used, f"documents read by {used or 'unknown'} (expected ai_parse_document)")
+        return f"documents parsed by {sorted(used)}"
+    L.check("traces", "documents parsed by ai_parse_document", parser)
+
+    def design():
+        need("html" in L.traces, "no HTML trace")
+        rows = L.sql(f"SELECT attributes:['mlflow.spanOutputs']['score']::int FROM {L.spans} WHERE trace_id = '{L.traces['html']}' AND name = 'design_lint' "
+                     f"ORDER BY start_time_unix_nano")
+        need(rows and rows[-1][0] is not None, "no design_lint span")
+        need(int(rows[-1][0]) >= 80, f"published page scored {rows[-1][0]}/100")
+        return f"design system score {rows[-1][0]}/100 ({len(rows)} check{'s' if len(rows) > 1 else ''})"
+    L.check("traces", "generated page checked against the design system", design)
 
 
 def gold(L):

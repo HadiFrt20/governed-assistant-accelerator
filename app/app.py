@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 import agent
 import docs
 import config
+import library
 import security
 import store
 from security import Busy, Forbidden
@@ -40,6 +41,7 @@ MIME = {"pptx": "application/vnd.openxmlformats-officedocument.presentationml.pr
 @app.on_event("startup")
 def _init():
     store.init()
+    library.start_indexer(sp_token)  # library search index (app identity; results are filtered per user)
 
 
 def sp_token():
@@ -83,6 +85,16 @@ def _forbidden(request: Request, exc: Forbidden):
     return JSONResponse({"error": str(exc)}, 403)
 
 
+def lib_token(request: Request):
+    """Identity used on the libraries: the user's own (Unity Catalog decides), or the app's when OBO is off."""
+    if not config.S.get("obo", True):
+        return sp_token()
+    tok = request.headers.get("x-forwarded-access-token")
+    if not tok:
+        raise Forbidden("Votre session n'autorise pas l'assistant à lire les bibliothèques en votre nom : reconnectez-vous.")
+    return tok
+
+
 def files_api(method, path, **kw):
     return requests.request(method, f"{agent.HOST}/api/2.0/fs/{path}", headers={"Authorization": f"Bearer {sp_token()}"}, timeout=120, **kw)
 
@@ -113,46 +125,9 @@ def cfg(request: Request):
             "templates": config.TEMPLATES, "departments": config.DEPARTMENTS}
 
 
-_LIB = {"at": 0, "items": []}
-
-
-def library_tree():
-    """Library listing, cached 120 s (it is read on every message)."""
-    if time.time() - _LIB["at"] < 120:
-        return _LIB["items"]
-    out = []
-
-    def pages(path):  # the directories API is paginated (next_page_token)
-        token = None
-        while True:
-            r = files_api("GET", f"directories{path}" + (f"?page_token={token}" if token else ""))
-            if not r.ok:
-                raise RuntimeError(f"listing de la bibliothèque impossible (HTTP {r.status_code})")
-            body = r.json()
-            yield from body.get("contents", [])
-            token = body.get("next_page_token")
-            if not token:
-                return
-
-    def walk(path):
-        for e in pages(path):
-            if e.get("is_directory"):
-                walk(e["path"])
-            else:
-                out.append({"path": e["path"], "name": e["name"], "folder": e["path"].removeprefix(config.LIBRARY + "/").rsplit("/", 1)[0] if "/" in e["path"].removeprefix(config.LIBRARY + "/") else "",
-                            "size": e.get("file_size"), "modified": e.get("last_modified")})
-    try:
-        walk(config.LIBRARY)
-    except Exception as e:  # any failure (HTTP, network, token): keep the last complete listing rather than failing the request
-        print("LIBRARY_ERROR", e, flush=True)
-        return _LIB["items"]
-    _LIB.update(at=time.time(), items=out)
-    return out
-
-
 @app.get("/api/library")
-def library():
-    return library_tree()
+def library_list(request: Request):
+    return library.tree(lib_token(request))
 
 
 @app.get("/api/conversations")
@@ -230,7 +205,7 @@ def _send(cid, request, body):
         raise Forbidden(f"message vide ou trop long (maximum {security.MAX_PROMPT_CHARS} caractères)")
     # attachments must be the user's own uploads: paths are re-validated, never trusted from the client
     # attachments: the user's own uploads or documents of the shared library; paths are re-validated, never trusted from the client
-    atts = [{"name": security.safe_filename(a.get("name")), "path": security.confine(a.get("path"), security.user_folder(user), config.LIBRARY)} for a in atts[:5]]
+    atts = [{"name": security.safe_filename(a.get("name")), "path": security.confine(a.get("path"), security.user_folder(user), *config.LIBRARY_ROOTS)} for a in atts[:5]]
     if not conv["turns"]:
         store.rename(cid, user, text[:80])
     content = text + ("".join(f"\n[Fichier joint : {a['path']}]" for a in atts))
@@ -239,7 +214,7 @@ def _send(cid, request, body):
            "messages": history + [{"role": "user", "content": content}]}
     user_token = request.headers.get("x-forwarded-access-token") if config.S.get("obo", True) else None
     st = sp_token()
-    listing = "\n".join(f"- {d['path']}" for d in library_tree())
+    listing = "\n".join(f"- {d['path']}" for d in library.tree(lib_token(request))[:80])
     tid = uuid.uuid4().hex
     LIVE.start(tid, user, job, conversation_id=cid)
     try:
@@ -252,11 +227,15 @@ def _send(cid, request, body):
     genie_conv = next((e.get("conversation_id") for t in reversed(conv["turns"]) for e in reversed(t.get("events") or [])
                        if e.get("type") == "handoff" and e.get("own")), None)
 
+    # the previous turn was answered by Genie One: a short follow-up continues it (decided by rule in agent.route, not by the model)
+    last = conv["turns"][-1] if conv["turns"] else None
+    last_data_question = last["user_text"] if last and any(e.get("type") == "handoff" for e in (last.get("events") or [])) else None
+
     def work():
         try:
             agent.run_agent(job, user_token, st, user=user, user_folder=security.user_folder(user), department=conv.get("department"), library_listing=listing,
                             conversation_id=cid, turn_id=tid, genie_conv=genie_conv, has_attachments=bool(atts), text=text,
-                            previous=(conv["turns"][-1]["user_text"] if conv["turns"] else None), attachments=atts)
+                            previous=last_data_question, attachments=atts)
         except (PermissionError, Forbidden) as e:  # expected refusals: tell the user exactly what to do
             job["events"].append({"type": "error", "text": str(e)})
             job["answer"] = str(e)
@@ -317,30 +296,27 @@ def download(name: str, request: Request):
 
 
 @app.get("/api/library/download")
-def library_download(path: str):
-    path = security.confine(path, config.LIBRARY)
-    r = files_api("GET", f"files{path}")
-    if not r.ok:
-        return JSONResponse({"error": "introuvable"}, 404)
+def library_download(path: str, request: Request):
+    path = security.confine(path, *config.LIBRARY_ROOTS)
+    data, _ = library.fetch(path, lib_token(request))  # read with the user's identity: a refusal comes from Unity Catalog
     name = path.rsplit("/", 1)[-1]
-    return Response(r.content, media_type=MIME.get(name.rsplit(".", 1)[-1], "application/octet-stream"),
+    return Response(data, media_type=MIME.get(name.rsplit(".", 1)[-1], "application/octet-stream"),
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @app.post("/api/library/upload")
-def library_upload(request: Request, file: UploadFile = File(...), folder: str = Form("General")):
-    """The library is trusted context for every user: only curators (security.library_curators) may add documents, never overwrite."""
-    if not security.can_curate_library(user_of(request)):
+def library_upload(request: Request, file: UploadFile = File(...), folder: str = Form("General"), library_id: str = Form("")):
+    """Libraries are trusted context for their readers. With OBO the document is written with the user's own identity, so only
+    holders of WRITE VOLUME on that library (its curators) can add to it; without OBO the app checks security.library_curators."""
+    lib = next((l for l in config.LIBRARIES if l["id"] == library_id), config.LIBRARIES[0])
+    obo = config.S.get("obo", True)
+    if not obo and not security.can_curate_library(user_of(request)):
         raise Forbidden("seuls les responsables de la bibliothèque peuvent y ajouter des documents")
     folder = re.sub(r"[^A-Za-z0-9_-]+", "_", folder)[:40] or "General"
     data = file.file.read(security.MAX_UPLOAD_BYTES + 1)
     if len(data) > security.MAX_UPLOAD_BYTES:
         raise Forbidden("fichier trop volumineux")
-    path = security.confine(f"{config.LIBRARY}/{folder}/{security.safe_filename(file.filename)}", config.LIBRARY)
-    r = files_api("PUT", f"files{path}?overwrite=false", data=data)
-    if r.status_code == 409:
-        raise Forbidden("un document porte déjà ce nom")
-    if not r.ok:
-        return JSONResponse({"error": "ajout refusé"}, r.status_code)
-    _LIB["at"] = 0  # refresh the cached listing
-    return {"ok": True, "path": path}
+    path = security.confine(f"{lib['root']}/{folder}/{security.safe_filename(file.filename)}", lib["root"])
+    library.put(path, data, lib_token(request))
+    library.wake()  # index it now rather than at the next cycle
+    return {"ok": True, "path": path, "library": lib["id"]}

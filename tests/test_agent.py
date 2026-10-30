@@ -33,21 +33,18 @@ def text(t, stop="end_turn"):
     return {"stop_reason": stop, "content": [{"type": "text", "text": t}]}
 
 
-def test_read_document_tool_reads_library_file(monkeypatch):
-    class R:
-        ok, status_code, content = True, 200, b"%PDF"
-        def raise_for_status(self): pass
-    monkeypatch.setattr(agent.requests, "get", lambda *a, **k: R())
-    monkeypatch.setattr(agent.docs, "extract", lambda name, data: "Texte de la procédure")
+def test_read_document_tool_reads_library_file_with_the_users_token(monkeypatch):
+    seen = []
+    monkeypatch.setattr(agent.library, "read", lambda path, token: seen.append(token) or ("Texte de la procédure", {"parser": "ai_parse_document", "cached": False}))
     j = job()
     gw = FakeGateway(j, [tool_use("read_document", {"path": f"{config.LIBRARY}/Qualite/proc.pdf"}), text("Fait.")])
     agent.agent_loop(gw, j, "alice@acme.com", None, "", security.user_folder("alice@acme.com"))
     tool_result = gw.sent[1][-1]["content"][0]["content"]
-    assert "Texte de la procédure" in tool_result and j["answer"] == "Fait."
+    assert "Texte de la procédure" in tool_result and j["answer"] == "Fait." and seen == ["user"]
 
 
 def test_read_document_refuses_other_users_uploads(monkeypatch):
-    monkeypatch.setattr(agent.requests, "get", lambda *a, **k: pytest.fail("must not fetch"))
+    monkeypatch.setattr(agent.library, "read", lambda *a, **k: pytest.fail("must not fetch"))
     j = job()
     other = f"{security.user_folder('bob@acme.com')}/x_secret.docx"
     gw = FakeGateway(j, [tool_use("read_document", {"path": other}), text("ok")])
@@ -151,3 +148,10 @@ def test_genie_timeout_is_an_error(monkeypatch):
     monkeypatch.setattr(agent.time, "sleep", lambda s: None)
     with pytest.raises(TimeoutError):
         g.ask("question")
+
+
+def test_short_follow_up_of_a_data_question_goes_to_genie_by_rule():
+    gw = FakeGateway(job(), [])   # no model call: the rule decides
+    assert agent.route(gw, "Et pour le site de Marseille ?", False, previous="Volume de Lyon en septembre ?") == ("genie", "règle (suite d'une question données)")
+    assert agent.route(gw, "Prépare une présentation de ces chiffres", False, previous="Volume de Lyon ?")[0] == "agent"
+    assert gw.sent == []
